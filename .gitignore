@@ -1,0 +1,9 @@
+*.dat
+*.o
+*.mod
+refer/
+refer2/
+bak/
+*.swp
+*tmp*
+*temp*
