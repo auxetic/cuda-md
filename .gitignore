@@ -4,6 +4,8 @@
 refer/
 refer2/
 bak/
+tags
 *.swp
 *tmp*
 *temp*
+build/
