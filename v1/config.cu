@@ -5,25 +5,27 @@
 tpvec *con; 
 double *radius;
 // device
-tpvec *dcon;
+tpvec  *dcon;
 double *dradius;
 
 
-void alloc_con( tpvec **tcon, double **tradius, int natom )
+// allocate memory space of config
+void alloc_con( tpvec **thcon, double **thradius, int tnatom )
     {
-    *tcon    = (tpvec *)malloc(sizeof(tpvec)*natom);
-    *tradius = (double*)malloc(sizeof(double)*natom);
+    *thcon    = (tpvec *)malloc(tnatom*sizeof(tpvec));
+    *thradius = (double*)malloc(tnatom*sizeof(double));
     }
 
-cudaError_t device_alloc_con( tpvec **tcon, double **tradius, int natom )
+// allocate memory space of config
+cudaError_t device_alloc_con( tpvec **tdcon, double **tdradius, int tnatom )
     {
     cudaError_t err;
-    err = cudaMalloc( (void **)tcon    , natom*sizeof(tpvec) );
+    err = cudaMalloc( (void **)tdcon, tnatom*sizeof(tpvec) );
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"Malloc failed in %s, %d, err=%d\n", __FILE__, __LINE__, err);
         }
-    err = cudaMalloc( (void **)tradius , natom*sizeof(double) );
+    err = cudaMalloc( (void **)tdradius , tnatom*sizeof(double) );
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"Malloc failed in %s, %d, err=%d\n", __FILE__, __LINE__, err);
@@ -31,16 +33,17 @@ cudaError_t device_alloc_con( tpvec **tcon, double **tradius, int natom )
     return cudaSuccess;
     }
 
-cudaError_t trans_con_to_gpu( tpvec *thcon, double *thradius, int natom,
-                              tpvec *tdcon, double *tdradius )
+// copy config from host to device
+cudaError_t trans_con_to_gpu( tpvec *tdcon, double *tdradius, int tnatom,
+                              tpvec *thcon, double *thradius )
     {
     cudaError_t err;
-    err = cudaMemcpy(tdcon, thcon, natom*sizeof(tpvec), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(tdcon, thcon, tnatom*sizeof(tpvec), cudaMemcpyHostToDevice);
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"cudaMemcpy failed in %s, %d, err=%d\n", __FILE__, __LINE__, err);
         }
-    err = cudaMemcpy(tdradius, thradius, natom*sizeof(double), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(tdradius, thradius, tnatom*sizeof(double), cudaMemcpyHostToDevice);
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"cudaMemcpy failed in %s, %d, err=%d\n", __FILE__, __LINE__, err);
@@ -48,16 +51,17 @@ cudaError_t trans_con_to_gpu( tpvec *thcon, double *thradius, int natom,
     return cudaSuccess;
     }
 
-cudaError_t trans_con_to_host( tpvec *tdcon, double *tdradius, int natom,
-                               tpvec *thcon, double *thradius )
+// copy config from device to host
+cudaError_t trans_con_to_host( tpvec *thcon, double *thradius, int tnatom,
+                               tpvec *tdcon, double *tdradius )
     {
     cudaError_t err;
-    err = cudaMemcpy(thcon, tdcon, natom*sizeof(tpvec), cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(thcon, tdcon, tnatom*sizeof(tpvec), cudaMemcpyDeviceToHost);
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"cudaMemcpy failed in %s, %d\n", __FILE__, __LINE__);
         }
-    err = cudaMemcpy(thradius, tdradius, natom*sizeof(double), cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(thradius, tdradius, tnatom*sizeof(double), cudaMemcpyDeviceToHost);
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"cudaMemcpy failed in %s, %d\n", __FILE__, __LINE__);
@@ -65,7 +69,8 @@ cudaError_t trans_con_to_host( tpvec *tdcon, double *tdradius, int natom,
     return cudaSuccess;
     }
     
-void gen_config( tpvec *tcon, double *tradius, tpbox *tbox, tpsets tsets )
+// generate random config on host
+void gen_config( tpvec *thcon, double *thradius, tpbox *tbox, tpsets tsets )
     {
     // 1. intiate random number generator;
     srand(tsets.seed);
@@ -74,16 +79,16 @@ void gen_config( tpvec *tcon, double *tradius, tpbox *tbox, tpsets tsets )
     for ( int i=0; i<tbox->natom; i++ )
         {
         if ( i < tbox->natom/2 )
-            tradius[i] = 0.5;
+            thradius[i] = 0.5;
         else
-            tradius[i] = 0.5 * ratio;
+            thradius[i] = 0.5 * ratio;
         }
 
-    // 3. cal area of disks
+    // 3. calc area of disks
     double sdisk = 0.0;
     for ( int i=0; i<tbox->natom; i++ )
         {
-        sdisk += tradius[i]*tradius[i];
+        sdisk += thradius[i]*thradius[i];
         }
     sdisk *= Pi;
 
@@ -99,17 +104,23 @@ void gen_config( tpvec *tcon, double *tradius, tpbox *tbox, tpsets tsets )
     // 5. give a random config
     for ( int i=0; i<tbox->natom; i++ )
         {
-        tcon[i].x = ( (double)rand()/RAND_MAX - 0.5 ) * tbox->x;
-        tcon[i].y = ( (double)rand()/RAND_MAX - 0.5 ) * tbox->y;
+        thcon[i].x = ( (double)rand()/RAND_MAX - 0.5 ) * tbox->x;
+        thcon[i].y = ( (double)rand()/RAND_MAX - 0.5 ) * tbox->y;
         }
     }
 
-void trim_config( tpvec *tcon, tpbox tbox )
+// move all atoms to central box
+void trim_config( tpvec *thcon, tpbox tbox )
     {
     for ( int i=0; i<tbox.natom; i++ )
         {
-        tcon[i].x = tcon[i].x - round( tcon[i].x / tbox.x ) * tbox.x;
-        tcon[i].y = tcon[i].y - round( tcon[i].y / tbox.y ) * tbox.y;
+        double cory;
+        cory = round( thcon[i].y * tbox.yinv );
+        thcon[i].x -= cory * tbox.y * tbox.strain;
+
+        thcon[i].x -= round( thcon[i].x * tbox.xinv ) * tbox.x;
+        //thcon[i].y -= round( thcon[i].y * tbox.yinv ) * tbox.y;
+        thcon[i].y -= cory * tbox.y;
         }
     }
 
