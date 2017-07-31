@@ -32,26 +32,24 @@ typedef struct
     {
     int   nbsum;
     int   nb[listmax];
-//  int   round[listmax][sysdim];
     float x, y;
     } tplist;
 
 typedef struct
     {
-    int nblocks, nblockx, nblocky;
-    double dblockx, dblocky;
+    int    nblocks, nblockx, nblocky;
+    double dlx, dly;
     } tpblockset;
 
 // variables define
-extern __managed__ double mdrmax;
-extern tpblock *hypercon;
-extern tpblockset hyperconset;
-extern tplist  *list;
+extern tpblockset hblockset;
+extern tpblock *dblock;
+extern tplist  *dlist;
 
 // subroutines
-void calc_nblocks( tpblockset *thyperconset, double lx, double ly, int natom );
-cudaError_t gpu_make_hypercon( tpvec *tcon, double *tradius, tpbox tbox, tpblock *thypercon, tpblockset thyperconset );
-cudaError_t gpu_make_list( tpblock *thypercon, tpvec *tcon, tpblockset thyperconset, tpbox tbox, tplist *tlist );
-bool gpu_check_list( tpvec *tcon, tpbox tbox, tplist *tlist );
+void calc_nblocks( tpblockset *tblockset, tpbox tbox );
+cudaError_t gpu_make_hypercon( tpvec *tdcon, double *tdradius, tpbox tbox, tpblock *tdblocks, tpblockset tblockset );
+cudaError_t gpu_make_list( tplist *tdlist, tpblock *tdblocks, tpvec *tdcon, tpblockset tblockset, tpbox tbox );
+bool gpu_check_list( tpvec *tdcon, tpbox tbox, tplist *tdlist );
 
 #endif

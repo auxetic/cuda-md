@@ -1,14 +1,13 @@
 #include "list.h"
 
 // variables define
-__managed__ double mdrmax;
 __managed__ int need_remake;
-tpblock *hypercon;
-tpblockset hyperconset;
-tplist  *list;
+tpblockset hblockset;
+tpblock *dblocks;
+tplist  *dlist;
 
 // device subroutine
-__device__ double atomicMax_list(double* address, double val)
+__device__ double atomicMax_double(double* address, double val)
     {
     unsigned long long int* address_as_ull = (unsigned long long int*)address;
     unsigned long long int old = *address_as_ull, assumed;
@@ -22,84 +21,101 @@ __device__ double atomicMax_list(double* address, double val)
     return __longlong_as_double(old);
     }
 
-void calc_nblocks( tpblockset *thyperconset, double lx, double ly, int natom )
+__device__ float atomicMax_float(float* address, float val)
+{
+    unsigned int* address_as_i = (unsigned int*) address;
+    unsigned int old = *address_as_i, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_i, assumed,
+            //__float_as_int(fmaxf(val, __int_as_float(assumed))));
+            __float_as_int( val>__int_as_float(assumed) ? val : __int_as_float(assumed) )
+        );
+    } while (assumed != old);
+    return __int_as_float(old);
+}
+
+// calc parameters of hyperconfig
+void calc_nblocks( tpblockset *tblockset, tpbox tbox )
     {
-    int nblockx = ceil( sqrt( (double)natom / mean_of_block ) );
+    // numbers of blocks in xy dimension
+    int nblockx = ceil( sqrt( (double)tbox.natom / mean_of_block ) );
     int nblocky = nblockx;
 
+    // sum number of blocks
     int nblocks = nblockx * nblocky;
 
-    double dlx = lx / nblockx;
-    double dly = ly / nblockx;
+    // length of block
+    double dlx = tbox.x / nblockx;
+    double dly = tbox.y / nblockx;
 
-    thyperconset->nblocks = nblocks;
-    thyperconset->nblockx = nblockx;
-    thyperconset->nblocky = nblocky;
-    thyperconset->dblockx = dlx;
-    thyperconset->dblocky = dly;
+    tblockset->nblocks = nblocks;
+    tblockset->nblockx = nblockx;
+    tblockset->nblocky = nblocky;
+    tblockset->dlx     = dlx;
+    tblockset->dly     = dly;
     }
 
-__global__ void kernel_make_hypercon( tpvec *tcon, double *tradius, 
-                           int natom,
-                           double lx, double ly, 
-                           double dblockx, double dblocky, 
-                           int nblockx,
-                           tpblock *thypercon )
+// set block.natom to zero
+__global__ void kernel_init_hypercon( tpblock *tdblocks, int tnblocks )
+    {
+    const int i   = blockDim.x * blockIdx.x + threadIdx.x;
+    if ( i < tnblocks )
+        tdblocks[i].natom = 0;
+    }
+
+// kernel subroutine for making hyperconfig
+__global__ void kernel_make_hypercon( tpblock *tdblocks,
+                                      int     tnblockx,
+                                      double  dlx, 
+                                      double  dly,
+                                      tpvec   *tdcon, 
+                                      double  *tdradius, 
+                                      double  lx, 
+                                      double  ly,
+                                      int     tnatom )
     {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if ( i >= natom )
+    if ( i >= tnatom )
         return;
 
     float xi, yi, ri;
-    xi = tcon[i].x;
-    yi = tcon[i].y;
-    ri = tradius[i];
+    xi = tdcon[i].x;
+    yi = tdcon[i].y;
+    ri = tdradius[i];
 
-    float xi0, yi0;
-    xi0 = xi - round( xi / lx ) * lx;
-    yi0 = yi - round( yi / ly ) * ly;
+    xi -= round( xi / lx ) * lx;
+    yi -= round( yi / ly ) * ly;
 
     int bidx, bidy, bid;
-    bidx = floor( (xi0+0.5*lx) / dblockx );
-    bidy = floor( (yi0+0.5*ly) / dblocky );
+    bidx = floor( (xi+0.5*lx) / dlx );
+    bidy = floor( (yi+0.5*ly) / dly );
+    bid  = bidx + bidy * tnblockx;
 
-    bid = bidx + bidy * nblockx;
-
-    int idxtemp = atomicAdd( &thypercon[bid].natom, 1 );
+    int idxtemp = atomicAdd( &tdblocks[bid].natom, 1 );
 
     if ( idxtemp < maxn_of_block )
         {
-        thypercon[bid].rx[idxtemp]     = xi;
-        thypercon[bid].ry[idxtemp]     = yi;
-        thypercon[bid].radius[idxtemp] = ri;
-        thypercon[bid].tag[idxtemp]    = i;
-        }
-
-    if ( idxtemp == ( maxn_of_block-2 ) )
-        return;
-    }
-
-__global__ void kernel_init_hypercon( tpblock *thypercon, int tnblocks )
-    {
-    const int i   = threadIdx.x + blockDim.x * blockIdx.x;
-
-    if ( i < tnblocks )
-        {
-        thypercon[i].natom = 0;
+        tdblocks[bid].rx[idxtemp]     = xi;
+        tdblocks[bid].ry[idxtemp]     = yi;
+        tdblocks[bid].radius[idxtemp] = ri;
+        tdblocks[bid].tag[idxtemp]    = i;
         }
     }
 
-cudaError_t gpu_make_hypercon( tpvec *tcon, double *tradius, tpbox tbox, tpblock *thypercon, tpblockset thyperconset )
+// host subroutine used for making hypercon
+cudaError_t gpu_make_hypercon( tpvec *tdcon, double *tdradius, tpbox tbox, tpblock *tdblocks, tpblockset tblockset )
     {
-    int  block_size = 256;
+    const int  block_size = 256;
 
     // set hypercon.natom to zero
-    kernel_init_hypercon <<< ceil(thyperconset.nblocks/block_size)+1, block_size >>> ( thypercon, thyperconset.nblocks );
+    dim3 grid1( (tblockset.nblocks/block_size)+1, 1, 1 );
+    dim3 thread1( block_size, 1, 1 );
+    kernel_init_hypercon <<< grid1, thread1 >>> ( tdblocks, tblockset.nblocks );
 
     cudaError_t err;
     err = cudaDeviceSynchronize();
-
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
@@ -109,15 +125,17 @@ cudaError_t gpu_make_hypercon( tpvec *tcon, double *tradius, tpbox tbox, tpblock
     dim3 grids(ceil(tbox.natom/block_size)+1,1,1);
     dim3 threads(block_size,1,1);
 
-    kernel_make_hypercon <<< grids, threads >>>( tcon, tradius, 
-                          tbox.natom, 
-                          tbox.x, tbox.y, 
-                          thyperconset.dblockx, thyperconset.dblocky,
-                          thyperconset.nblockx,
-                          thypercon );
+    kernel_make_hypercon <<< grids, threads >>>( tdblocks, 
+                                                 tblockset.nblockx,
+                                                 tblockset.dlx,
+                                                 tblockset.dly,
+                                                 tdcon,
+                                                 tdradius, 
+                                                 tbox.x,
+                                                 tbox.y,
+                                                 tbox.natom );
 
     err = cudaDeviceSynchronize();
-
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
@@ -126,9 +144,25 @@ cudaError_t gpu_make_hypercon( tpvec *tcon, double *tradius, tpbox tbox, tpblock
     return err;
     }
 
-__global__ void kernel_make_list( tpblock *thypercon, float lx, float ly, tplist *tlist )
+// set list[].natom to zero; save current config to list.
+__global__ void kernel_zero_list( tpvec *tdcon, tplist *tdlist, int natom )
     {
-    __shared__ tpblock blocks[9];
+    const int i   = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if ( i < natom )
+        {
+        tdlist[i].nbsum = 0;
+        tdlist[i].x = tdcon[i].x;
+        tdlist[i].y = tdcon[i].y;
+        }
+    }
+
+__global__ void kernel_make_list( tplist *tdlist,
+                                  float lx, 
+                                  float ly, 
+                                  tpblock *tdblocks )
+    {
+    __shared__ tpblock local_blocks[9];
 
     int bidx = blockIdx.x;  
     int bidy = blockIdx.y;
@@ -150,82 +184,66 @@ __global__ void kernel_make_list( tpblock *thypercon, float lx, float ly, tplist
         if ( bidx == gridDim.x-1 && i==1  ) joffset -= gridDim.x;
         if ( bidy == gridDim.y-1 && j==1  ) joffset -= gridDim.x*gridDim.y;
 
-        blocks[atomi] = thypercon[joffset];
+        local_blocks[atomi] = tdblocks[joffset];
         }
 
     __syncthreads();
 
-    if ( atomi < blocks[4].natom ) 
+    if ( atomi < local_blocks[4].natom ) 
         {
         float xi, yi, ri;
         int itag;
         // get xyr from shared memory
-        xi = blocks[4].rx[atomi];
-        yi = blocks[4].ry[atomi];
-        ri = blocks[4].radius[atomi];
-        itag = blocks[4].tag[atomi];
-        // save xy to tlist
-      //tlist[itag].x = xi;
-      //tlist[itag].y = yi;
-      //tlist[itag].nbsum = 0;
+        xi   = local_blocks[4].rx[atomi];
+        yi   = local_blocks[4].ry[atomi];
+        ri   = local_blocks[4].radius[atomi];
+        itag = local_blocks[4].tag[atomi];
         for ( int ib=0; ib<9; ib++ ) 
             {
-            for ( int atomj=0; atomj<blocks[ib].natom; atomj++ ) 
+            for ( int atomj=0; atomj<local_blocks[ib].natom; atomj++ ) 
                 {
                 float xj, yj, rj;
                 int jtag;
-                xj = blocks[ib].rx[atomj];
-                yj = blocks[ib].ry[atomj];
-                rj = blocks[ib].radius[atomj];
-                jtag = blocks[ib].tag[atomj];
+                xj   = local_blocks[ib].rx[atomj];
+                yj   = local_blocks[ib].ry[atomj];
+                rj   = local_blocks[ib].radius[atomj];
+                jtag = local_blocks[ib].tag[atomj];
                 if ( itag == jtag ) continue;
-                float xij, yij, rij2, dijcut2;
-                xij = xj - xi;
-                yij = yj - yi;
-                dijcut2 = ri + rj + nlcut;
-                dijcut2 = dijcut2 * dijcut2;
-                int iroundx, iroundy;
-                iroundx = (int)round(xij/lx);
-                iroundy = (int)round(yij/ly);
 
-                xij = xij - iroundx * lx;
-                yij = yij - iroundy * ly;
-
+                float xij, yij, rij2;
+                xij  = xj - xi;
+                yij  = yj - yi;
+                xij -= round(xij/lx) * lx;
+                yij -= round(yij/ly) * ly;
                 rij2 = xij*xij + yij*yij;
+
+                float dijcut2;
+                dijcut2  = ri + rj + nlcut;
+                dijcut2 *= dijcut2;
 
                 if ( rij2 < dijcut2 ) 
                     {
-                    if ( tlist[itag].nbsum == listmax - 2 ) continue;
-                    tlist[itag].nbsum += 1;
-                    tlist[itag].nb[tlist[itag].nbsum-1] = jtag;
-//                  tlist[itag].round[tlist[itag].nbsum-1][0] = iroundx;
-//                  tlist[itag].round[tlist[itag].nbsum-1][1] = iroundy;
+                    if ( tdlist[itag].nbsum == listmax - 2 ) continue;
+                    tdlist[itag].nbsum += 1;
+                    tdlist[itag].nb[tdlist[itag].nbsum-1] = jtag;
                     }
                 }
             }
         }
     }
 
-__global__ void kernel_zero_list( tpvec *tcon, tplist *tlist, int natom )
-    {
-    const int tid = threadIdx.x;
-    const int i   = tid + blockDim.x * blockIdx.x;
-
-    if ( i < natom )
-        {
-        tlist[i].nbsum = 0;
-        tlist[i].x = tcon[i].x;
-        tlist[i].y = tcon[i].y;
-        }
-    }
-
-cudaError_t gpu_make_list( tpblock *thypercon, tpvec *tcon, tpblockset thyperconset, tpbox tbox, tplist *tlist )
+// host subroutine used for makelist
+cudaError_t gpu_make_list( tplist  *tdlist,
+                           tpblock *tdblocks, 
+                           tpvec   *tdcon, 
+                           tpblockset tblockset, 
+                           tpbox tbox )
     {
     const int block_size = 256;
     float lx = tbox.x;
     float ly = tbox.y;
 
-    kernel_zero_list <<< ceil(tbox.natom/block_size)+1, block_size >>> ( tcon, tlist, tbox.natom );
+    kernel_zero_list <<< ceil(tbox.natom/block_size)+1, block_size >>> ( tdcon, tdlist, tbox.natom );
     cudaError_t err;
     err = cudaDeviceSynchronize();
 
@@ -234,9 +252,9 @@ cudaError_t gpu_make_list( tpblock *thypercon, tpvec *tcon, tpblockset thypercon
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
         }
 
-    dim3 grids(thyperconset.nblockx,thyperconset.nblocky,1);
+    dim3 grids(tblockset.nblockx,tblockset.nblocky,1);
     dim3 threads(maxn_of_block,1,1);
-    kernel_make_list <<< grids, threads >>> ( thypercon, lx, ly, tlist );
+    kernel_make_list <<< grids, threads >>> ( tdlist, lx, ly, tdblocks );
 
     err = cudaDeviceSynchronize();
 
@@ -249,67 +267,75 @@ cudaError_t gpu_make_list( tpblock *thypercon, tpvec *tcon, tpblockset thypercon
     }
 
 
-__global__ void kernel_check_list( tpvec *tcon, int natom, tplist *tlist )
+// kernel subroutine used for checkking list
+__global__ void kernel_check_list(  tpvec *tdcon, 
+                                    int tnatom, 
+                                    tplist *tdlist, 
+                                    float lx, float ly )
     {
-    __shared__ int block_need_remake;
-    __shared__ double block_drmax;
+    __shared__ int    block_need_remake;
 
-    const int i   = threadIdx.x + blockIdx.x * blockDim.x;
+    const int i   = blockIdx.x * blockDim.x + threadIdx.x;
     const int tid = threadIdx.x;
 
-    if ( i >= natom )
+    if ( i >= tnatom )
         return;
 
     if ( tid == 0 ) 
         {
         block_need_remake = 0;
-        block_drmax = 0.0;
         }
 
     __syncthreads();
 
     float xi, yi;
-    xi = tcon[i].x;
-    yi = tcon[i].y;
+    xi = tdcon[i].x;
+    yi = tdcon[i].y;
 
     double th_max_dis, dr1, dr2; //dr3;
-    dr1 = xi - tlist[i].x;
-    dr2 = yi - tlist[i].y;
+    dr1 = (xi/lx - tdlist[i].x)*lx;
+    dr2 = (yi/ly - tdlist[i].y)*ly;
 
     th_max_dis = 2.0 * 1.42 * fmax(dr1, dr2);
-
-    atomicMax_list( &block_drmax, th_max_dis );
-
-    if ( th_max_dis > nlcut ) 
+    
+    if ( th_max_dis > nlcut )
         block_need_remake = 1;
 
     __syncthreads();
     
     if ( tid == 0 )
         {
-        atomicMax_list( &mdrmax, block_drmax );
         if ( block_need_remake == 1 )
-            {
             need_remake = 1;
-            }
         }
 
     }
 
-bool gpu_check_list( tpvec *tcon, tpbox tbox, tplist *tlist )
+// host subroutine used for checking list
+bool gpu_check_list( tpvec *tdcon, tpbox tbox, tplist *tdlist )
     {
 
     need_remake = 0;
     mdrmax = 0.0;
 
+    float lx = tbox.x;
+    float ly = tbox.y;
+
     int block_size = 512;
     dim3 grids( ceil((double)tbox.natom/block_size), 1, 1 );
     dim3 threads( block_size, 1, 1 );
 
-    kernel_check_list <<< grids, threads >>> ( tcon, tbox.natom, tlist );
-    cudaDeviceSynchronize();
+    kernel_check_list <<< grids, threads >>> ( tdcon, 
+                                               tbox.natom, 
+                                               tdlist,
+                                               lx, ly );
+    cudaError_t err;
+    err = cudaDeviceSynchronize();
 
-//    printf( "drmax = %e\n", mdrmax );
+    if ( err != cudaSuccess )
+        {
+        fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        }
 
     bool flag = 0;
     if ( need_remake )
