@@ -1,8 +1,8 @@
 #include "mdfunc.h"
 
-#define BLOCK_SIZE_256  256 
-#define BLOCK_SIZE_512  512 
-#define BLOCK_SIZE_1024 1024 
+#define BLOCK_SIZE_256  256
+#define BLOCK_SIZE_512  512
+#define BLOCK_SIZE_1024 1024
 
 __managed__ double gsm_fmax;
 __managed__ double gsm_wili;
@@ -45,7 +45,7 @@ __global__ void kernel_update_vr( tpvec *tdcon, tpvec *tdconv, tpvec *tdconf, in
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     if ( i < natom )
-        { 
+        {
         double r, v, f;
 
         r = tdcon[i].x;
@@ -54,7 +54,7 @@ __global__ void kernel_update_vr( tpvec *tdcon, tpvec *tdconv, tpvec *tdconf, in
         v += 0.5 * f * dt;
         r += v * dt;
         tdconv[i].x = v;
-        tdcon[i].x += r;
+        tdcon[i].x = r;
 
         r = tdcon[i].y;
         v = tdconv[i].y;
@@ -62,7 +62,7 @@ __global__ void kernel_update_vr( tpvec *tdcon, tpvec *tdconv, tpvec *tdconf, in
         v += 0.5 * f * dt;
         r += v * dt;
         tdconv[i].y = v;
-        tdcon[i].y += r;
+        tdcon[i].y = r;
         }
     }
 
@@ -137,10 +137,13 @@ __global__ void kernel_calc_force( tplist *tdlist, tpvec *tdcon, double *tdradiu
 
     const int i = threadIdx.x + blockIdx.x * blockDim.x;
 
+    if ( threadIdx.x == 0 )
+        sm_wili = 0.0;
+
     if ( i >= natom )
         return;
 
-    if ( i == 0 ) sm_wili = 0.0;
+    __syncthreads();
 
     int nbsum = tdlist[i].nbsum;
 
@@ -169,17 +172,17 @@ __global__ void kernel_calc_force( tplist *tdlist, tpvec *tdcon, double *tdradiu
 
         double rij;
         rij = xj*xj + yj*yj; // rij2
-        dij = ri + dij;
+        dij = dij + ri;
 
         if ( rij < dij*dij )
             {
             rij = sqrt(rij);
-            
+
             //double fr  - > dij
             dij = ( 1.0 - rij/dij ) / dij / rij;
 
             // wili
-            wilii += dij * rij*rij; 
+            wilii += dij * rij*rij;
 
             fxi -= dij * xj;
             fyi -= dij * yj;
@@ -189,6 +192,7 @@ __global__ void kernel_calc_force( tplist *tdlist, tpvec *tdcon, double *tdradiu
     tdconf[i].y = fyi;
 
     atomicAdd( &sm_wili, wilii );
+
     __syncthreads();
     atomicAdd( &gsm_wili, sm_wili );
 
@@ -237,11 +241,11 @@ __global__ void kernel_calc_fmax( tpvec *tdconf, int natom )
         }
 
     __syncthreads();
-    
+
     int j = BLOCK_SIZE_256;
     j >>= 1;
     while ( j != 0 )
-        { 
+        {
         if ( tid < j )
             {
             block_f[tid] = fmax( block_f[tid], block_f[tid+j] );

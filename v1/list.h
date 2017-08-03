@@ -1,4 +1,4 @@
-//>>vv main 
+//>>vv main
 #ifndef list_h
 #define list_h
 
@@ -19,7 +19,7 @@
 #define mean_of_block 64
 
 // type define
-typedef struct 
+typedef struct
     {
     int   natom;
     float rx[maxn_of_block];
@@ -28,7 +28,7 @@ typedef struct
     int   tag[maxn_of_block];
     } tpblock;
 
-typedef struct 
+typedef struct
     {
     int   nbsum;
     int   nb[listmax];
@@ -43,7 +43,7 @@ typedef struct
 
 // variables define
 extern tpblockset hblockset;
-extern tpblock *dblock;
+extern tpblock *dblocks;
 extern tplist  *dlist;
 
 // subroutines

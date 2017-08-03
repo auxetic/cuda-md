@@ -22,7 +22,7 @@ typedef struct
     } tpmdset;
 
 // variable define
-tpmdset mdset;
+extern tpmdset mdset;
 
 void init_nvt( tpvec *thcon, double *thradius, tpbox tbox, double ttemper );
 void gpu_run_nvt( tpvec *tdcon, tpvec *tdconv, tpvec *tdconf, double ttemper, int steps );

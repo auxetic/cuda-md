@@ -8,22 +8,21 @@
 // type define
 typedef struct
     {
-    int natom;
-    double phi;
-    double x, y, xinv, yinv;
-    double strain;
-    int nblocks, nblockx, nblocky;
-    double xlim, ylim, bdx, bdy;
+    int     natom;
+    double  phi;
+    double  x, y;
+    double  xinv, yinv;
+    double  strain;
     } tpbox;
 
 typedef struct
     {
-    int seed;
-    double phi;
+    int     seed;
+    double  phi;
     } tpsets;
 
 // variables define
-static tpbox box;
-static tpsets sets;
+static tpbox    box;
+static tpsets   sets;
 
 #endif

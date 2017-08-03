@@ -2,7 +2,7 @@
 
 // variables define
 // host
-tpvec *con; 
+tpvec *con;
 double *radius;
 // device
 tpvec  *dcon;
@@ -68,7 +68,7 @@ cudaError_t trans_con_to_host( tpvec *thcon, double *thradius, int tnatom,
         }
     return cudaSuccess;
     }
-    
+
 // generate random config on host
 void gen_config( tpvec *thcon, double *thradius, tpbox *tbox, tpsets tsets )
     {

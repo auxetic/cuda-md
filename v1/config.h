@@ -19,7 +19,7 @@ typedef struct
 
 // variables define
 // host
-extern tpvec *con; 
+extern tpvec *con;
 extern double *radius;
 // device
 extern tpvec *dcon;

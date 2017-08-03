@@ -15,8 +15,8 @@ int main(int argc, const char *argv[])
 
     cudaSetDevice(0);
     // set
-    box.natom = 2000000;
-    box.phi = 1.0;
+    box.natom = 100000;
+    box.phi = 0.86;
     sets.seed = 201;
 
     // cpu config
@@ -24,8 +24,8 @@ int main(int argc, const char *argv[])
     alloc_con( &con, &radius, box.natom );
     gen_config( con, radius, &box, sets );
 
-    // md
-    init_nvt( con, radius, box, 1.e-4 );
+    // fire
+    mini_fire_cv( con, radius, box );
 
     FILE *fio;
     fio = fopen("con.dat", "w+");
