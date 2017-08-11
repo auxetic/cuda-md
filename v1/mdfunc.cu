@@ -137,11 +137,11 @@ __global__ void kernel_calc_force( tplist *tdlist, tpvec *tdcon, double *tdradiu
 
     const int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if ( threadIdx.x == 0 )
-        sm_wili = 0.0;
-
     if ( i >= natom )
         return;
+
+    if ( threadIdx.x == 0 )
+        sm_wili = 0.0;
 
     __syncthreads();
 
@@ -194,7 +194,8 @@ __global__ void kernel_calc_force( tplist *tdlist, tpvec *tdcon, double *tdradiu
     atomicAdd( &sm_wili, wilii );
 
     __syncthreads();
-    atomicAdd( &gsm_wili, sm_wili );
+    if ( threadIdx.x == 0 )
+        atomicAdd( &gsm_wili, sm_wili );
 
     }
 
@@ -207,13 +208,14 @@ cudaError_t gpu_calc_force( tplist *tdlist, tpvec *tdcon, double *tdradius, tpve
     const double ly = tbox.y;
 
     gsm_wili = 0.0;
+    cudaError_t err;
+    err = cudaDeviceSynchronize();
 
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
 
     kernel_calc_force <<< grids, threads >>>( tdlist, tdcon, tdradius, tdconf, natom, lx, ly );
 
-    cudaError_t err;
     err = cudaDeviceSynchronize();
 
     if ( err != cudaSuccess )

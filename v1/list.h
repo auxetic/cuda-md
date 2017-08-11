@@ -48,6 +48,7 @@ extern tplist  *dlist;
 
 // subroutines
 void calc_nblocks( tpblockset *tblockset, tpbox tbox );
+void recalc_nblocks( tpblockset *tblockset, tpbox tbox );
 cudaError_t gpu_make_hypercon( tpvec *tdcon, double *tdradius, tpbox tbox, tpblock *tdblocks, tpblockset tblockset );
 cudaError_t gpu_make_list( tplist *tdlist, tpblock *tdblocks, tpvec *tdcon, tpblockset tblockset, tpbox tbox );
 bool gpu_check_list( tpvec *tdcon, tpbox tbox, tplist *tdlist );

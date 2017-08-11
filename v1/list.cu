@@ -27,6 +27,21 @@ void calc_nblocks( tpblockset *tblockset, tpbox tbox )
     tblockset->dly     = dly;
     }
 
+void recalc_nblocks( tpblockset *tblockset, tpbox tbox )
+    {
+    // numbers of blocks in xy dimension
+    int nblockx = tblockset->nblockx;
+    int nblocky = tblockset->nblocky;
+    //int nblocky = nblockx;
+
+    // length of block
+    double dlx = tbox.x / nblockx;
+    double dly = tbox.y / nblocky;
+
+    tblockset->dlx     = dlx;
+    tblockset->dly     = dly;
+    }
+
 // set block.natom to zero
 __global__ void kernel_init_hypercon( tpblock *tdblocks, int tnblocks )
     {
