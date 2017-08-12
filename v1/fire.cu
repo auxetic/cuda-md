@@ -15,7 +15,7 @@
 // inner subroutines
 cudaError_t gpu_calc_fire_para( tpvec *tdconv, tpvec *tdconf, tpbox tbox );
 cudaError_t gpu_fire_modify_v( tpvec *tdconv, tpvec *tdconf, double tfire_onemb, double tfire_betamvndfn, tpbox tbox);
-cudaError_t gpu_firecp_update_box( tpvec *tdcon, tpbox *firebox, double dt, double target_press, double current_press, double *lv, int tstep );
+cudaError_t gpu_firecp_update_box( tpvec *tdcon, tpbox *firebox, double dt, double current_press, double target_press, double *lv, int tstep );
 
 // variables
 __managed__ double gsm_fire_vn2, gsm_fire_fn2, gsm_fire_power, gsm_fire_fmax;
@@ -156,7 +156,7 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
 
     }
 
-void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double ttarget_press )
+void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_press )
     {
     // allocate arrays used in fire
     // 1. box
@@ -231,14 +231,15 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double ttarget_pr
 
         // velocity verlet / integrate veclocity and config
         gpu_update_vr( dcon, dconv, dconf, firebox, dt );
-        gpu_firecp_update_box( dcon, &firebox, dt, press, ttarget_press, &lv, step );
+        gpu_firecp_update_box( dcon, &firebox, dt, press, target_press, &lv, step );
 
         // calc force
         gpu_calc_force( dlist, dcon, dradius, dconf, &press, firebox );
 
         // velocity verlet / integrate velocity
         gpu_update_v( dconv, dconf, firebox, dt );
-        double lf = ( press - ttarget_press ) / sqrt((double)step) / (double)(firebox.natom) * ttarget_press;
+        double lf;
+        lf = ( press - target_press ) * target_press;
         lv += lf * dt * 0.5;
 
         // fire
@@ -247,7 +248,7 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double ttarget_pr
         // save power, fn2, vn2 in global variabls
         gpu_calc_fire_para( dconv, dconf, firebox );
 
-        if ( gsm_fire_fmax < fire_const_fmax && fabs( press - ttarget_press ) < fire_const_fmax )
+        if ( gsm_fire_fmax < fire_const_fmax && fabs( press - target_press ) < fire_const_fmax )
             {
             printf( "done fmax = %e\n", gsm_fire_fmax );
             break;
@@ -259,11 +260,12 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double ttarget_pr
         fire_betamvndfn = fire_beta * fire_vndfn;
 
        //cudaMemcpy( hconv, dconv, firebox.natom*sizeof(tpvec), cudaMemcpyDeviceToHost );
+        if ( lf * lv <= 0.0 )
+            lv = 0.0;
 
         if ( gsm_fire_power >= 0.0 )
             {
             gpu_fire_modify_v( dconv, dconf, fire_onemb, fire_betamvndfn, firebox );
-            lv = fire_onemb * lv + fire_betamvndfn * ( press - ttarget_press );
             }
 
         if ( gsm_fire_power >= 0.0 && fire_count > fire_const_nmin )
@@ -278,11 +280,10 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double ttarget_pr
             dt *= fire_const_fdec;
             fire_beta = fire_const_beta0;
             gpu_zero_confv( dconv, firebox );
-            lv = 0.0;
             }
 
         if ( step%200 == 0 )
-            printf( "step=%0.6d, fmax=%16.6e, press=%16.6e, lx=%16.6e, dt=%16.6e \n", step, gsm_fire_fmax, press, firebox.x, dt );
+            printf( "step=%0.6d, f=%16.6e, p=%26.16e, l=%26.16e, dt=%16.6e \n", step, gsm_fire_fmax, press, firebox.x, dt );
 
         }
 
@@ -439,13 +440,13 @@ __global__ void kernel_firecp_update_box( tpvec *tdcon, double tscale, int natom
 
     }
 
-cudaError_t gpu_firecp_update_box( tpvec *tdcon, tpbox *firebox, double dt, double target_press, double current_press, double *lv, int tstep )
+cudaError_t gpu_firecp_update_box( tpvec *tdcon, tpbox *firebox, double dt, double current_press, double target_press, double *lv, int tstep )
     {
     const int block_size = 1024;
     const int natom = firebox->natom;
 
     double l = firebox->x;
-    double lf = ( current_press - target_press ) / sqrt((double)tstep) / (double)natom * target_press;
+    double lf = ( current_press - target_press ) * target_press ;
 
     l += *lv * dt + lf * dt * dt * 0.5;
     *lv += lf * dt * 0.5;
