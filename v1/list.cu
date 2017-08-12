@@ -109,6 +109,7 @@ cudaError_t gpu_make_hypercon( tpvec *tdcon, double *tdradius, tpbox tbox, tpblo
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     // main
@@ -129,6 +130,7 @@ cudaError_t gpu_make_hypercon( tpvec *tdcon, double *tdradius, tpbox tbox, tpblo
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     return err;
@@ -240,6 +242,7 @@ cudaError_t gpu_make_list( tplist  *tdlist,
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     dim3 grids(tblockset.nblockx,tblockset.nblocky,1);
@@ -251,6 +254,7 @@ cudaError_t gpu_make_list( tplist  *tdlist,
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     return err;
@@ -324,6 +328,7 @@ bool gpu_check_list( tpvec *tdcon, tpbox tbox, tplist *tdlist )
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     bool flag = 0;

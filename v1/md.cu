@@ -77,6 +77,7 @@ cudaError_t gpu_calc_chi( tpvec *tdconv, tpvec *tdconf, tpbox tbox, double *chi 
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
     
     *chi = mpf/mpp;
@@ -142,6 +143,7 @@ cudaError_t gpu_modify_force( tpvec *tdconf, tpvec *tdconv, tpbox tbox, double t
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
     
     return err;

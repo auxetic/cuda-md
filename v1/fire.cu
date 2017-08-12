@@ -377,6 +377,7 @@ cudaError_t gpu_calc_fire_para( tpvec *tdconv, tpvec *tdconf, tpbox tbox )
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     return err;
@@ -419,6 +420,7 @@ cudaError_t gpu_fire_modify_v( tpvec *tdconv, tpvec *tdconf, double tfire_onemb,
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     return err;
@@ -468,6 +470,7 @@ cudaError_t gpu_firecp_update_box( tpvec *tdcon, tpbox *firebox, double dt, doub
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     return err;

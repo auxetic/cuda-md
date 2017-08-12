@@ -24,11 +24,13 @@ cudaError_t device_alloc_con( tpvec **tdcon, double **tdradius, int tnatom )
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"Malloc failed in %s, %d, err=%d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
     err = cudaMalloc( (void **)tdradius , tnatom*sizeof(double) );
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"Malloc failed in %s, %d, err=%d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
     return cudaSuccess;
     }
@@ -42,11 +44,13 @@ cudaError_t trans_con_to_gpu( tpvec *tdcon, double *tdradius, int tnatom,
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"cudaMemcpy failed in %s, %d, err=%d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
     err = cudaMemcpy(tdradius, thradius, tnatom*sizeof(double), cudaMemcpyHostToDevice);
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"cudaMemcpy failed in %s, %d, err=%d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
     return cudaSuccess;
     }
@@ -60,11 +64,13 @@ cudaError_t trans_con_to_host( tpvec *thcon, double *thradius, int tnatom,
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"cudaMemcpy failed in %s, %d\n", __FILE__, __LINE__);
+        exit(-1);
         }
     err = cudaMemcpy(thradius, tdradius, tnatom*sizeof(double), cudaMemcpyDeviceToHost);
     if ( err != cudaSuccess )
         {
         fprintf(stderr,"cudaMemcpy failed in %s, %d\n", __FILE__, __LINE__);
+        exit(-1);
         }
     return cudaSuccess;
     }

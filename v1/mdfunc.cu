@@ -34,6 +34,7 @@ cudaError_t gpu_zero_confv( tpvec *tdconfv, tpbox tbox )
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     return err;
@@ -82,6 +83,7 @@ cudaError_t gpu_update_vr( tpvec *tdcon, tpvec *tdconv, tpvec *tdconf, tpbox tbo
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     return err;
@@ -125,6 +127,7 @@ cudaError_t gpu_update_v( tpvec *tdconv, tpvec *tdconf, tpbox tbox, double dt)
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     return err;
@@ -221,6 +224,7 @@ cudaError_t gpu_calc_force( tplist *tdlist, tpvec *tdcon, double *tdradius, tpve
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     *static_press = gsm_wili / 2.0 / 2.0 / lx / ly;
@@ -281,6 +285,7 @@ double gpu_calc_fmax( tpvec *tdconf, tpbox tbox )
     if ( err != cudaSuccess )
         {
         fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
+        exit(-1);
         }
 
     return gsm_fmax;
