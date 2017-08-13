@@ -8,3 +8,5 @@ tags
 *.swp
 *tmp*
 build/
+build1/
+build2/

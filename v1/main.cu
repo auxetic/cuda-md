@@ -13,40 +13,42 @@
 int main(void)
     {
 
-    int deviceno, natom, seed;
+    int    deviceno, natom, seed;
     double press;
-    char foutput[100];
-    char foutput_bak[100];
+    char   foutput[250];
+    char   foutput_bak[250];
 
-    scanf("%d", &deviceno);
-    scanf("%d", &natom );
-    scanf("%d", &seed );
+    scanf("%d",  &deviceno);
+    scanf("%d",  &natom );
+    scanf("%d",  &seed );
     scanf("%le", &press );
-    scanf("%s", foutput );
-    scanf("%s", foutput_bak );
+    scanf("%s",  foutput );
+    scanf("%s",  foutput_bak );
 
     cudaSetDevice(deviceno);
     // set
     box.natom = natom;
-    box.phi = 0.86;
+    box.phi   = 0.86;
     sets.seed = seed;
 
-    printf("%d\n", deviceno);
-    printf("%d\n", natom);
-    printf("%d\n", seed);
-    printf("%e\n", press);
-    printf("%s\n", foutput);
-    printf("%s\n", foutput_bak);
+    printf("device number   : %d\n"  , deviceno);
+    printf("number to atoms : %d\n"  , natom );
+    printf("seed            : %d\n"  , seed );
+    printf("target press    : %le\n" , press );
+    printf("foutput         : %s\n"  , foutput );
+    printf("foutput_bak     : %s\n"  , foutput_bak );
 
     // cpu config
     //printf( "allocate *con, generate a random config\n" );
     alloc_con( &con, &radius, box.natom );
     FILE *fdump = fopen(foutput_bak, "r");
-    if ( fdump == NULL )
+    if ( fdump == NULL ) {
         gen_config( con, radius, &box, sets );
-    else
+        }
+    else {
         read_config( fdump, con, radius, &box );
-    fclose(fdump);
+        fclose(fdump);
+        }
 
     // fire
     mini_fire_cp( con, radius, &box, press );
