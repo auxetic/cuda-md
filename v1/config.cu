@@ -115,6 +115,33 @@ void gen_config( tpvec *thcon, double *thradius, tpbox *tbox, tpsets tsets )
         }
     }
 
+// read config
+void read_config( FILE *fio, tpvec *thcon, double *thradius, tpbox *tbox )
+    {
+    int natom;
+    fscanf(fio, "%d", &natom);
+    tbox->natom = natom;
+    double len;
+    fscanf(fio, "%le", &len);
+    tbox->x = len;
+    tbox->y = len;
+    tbox->xinv = 1e0/len;
+    tbox->yinv = 1e0/len;
+    tbox->strain = 0e0;
+
+    for ( int i=0; i<natom; i++ )
+        {
+        double x, y, r;
+        fscanf(fio, "%le", &x);
+        fscanf(fio, "%le", &y);
+        fscanf(fio, "%le", &r);
+        thcon[i].x  = x*len;
+        thcon[i].y  = y*len;
+        thradius[i] = r*len;
+        }
+    }
+
+
 // move all atoms to central box
 void trim_config( tpvec *thcon, tpbox tbox )
     {

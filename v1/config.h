@@ -31,6 +31,7 @@ cudaError_t device_alloc_con( tpvec **tdcon, double **tdradius, int tnatom );
 cudaError_t trans_con_to_gpu(  tpvec *tdcon, double *tdradius, int tnatom, tpvec *thcon, double *thradius );
 cudaError_t trans_con_to_host( tpvec *thcon, double *thradius, int tnatom, tpvec *tdcon, double *tdradius );
 void gen_config( tpvec *thcon, double *thradius, tpbox *tbox, tpsets tsets );
+void read_config( FILE *fio, tpvec *thcon, double *thradius, tpbox *tbox );
 void trim_config( tpvec *thcon, tpbox tbox );
 
 #endif

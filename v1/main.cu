@@ -16,12 +16,14 @@ int main(void)
     int deviceno, natom, seed;
     double press;
     char foutput[100];
+    char foutput_bak[100];
 
     scanf("%d", &deviceno);
     scanf("%d", &natom );
     scanf("%d", &seed );
     scanf("%le", &press );
     scanf("%s", foutput );
+    scanf("%s", foutput_bak );
 
     cudaSetDevice(deviceno);
     // set
@@ -34,12 +36,17 @@ int main(void)
     printf("%d\n", seed);
     printf("%e\n", press);
     printf("%s\n", foutput);
+    printf("%s\n", foutput_bak);
 
-//exit(0);
     // cpu config
     //printf( "allocate *con, generate a random config\n" );
     alloc_con( &con, &radius, box.natom );
-    gen_config( con, radius, &box, sets );
+    FILE *fdump = fopen(foutput_bak, "r");
+    if ( fdump == NULL )
+        gen_config( con, radius, &box, sets );
+    else
+        read_config( fdump, con, radius, &box );
+    fclose(fdump);
 
     // fire
     mini_fire_cp( con, radius, &box, press );

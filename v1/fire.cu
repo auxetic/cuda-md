@@ -9,7 +9,7 @@
 #define fire_const_fdec    0.5e0
 #define fire_const_fbeta   0.99e0
 #define fire_const_nmin    5
-#define fire_const_stepmax 10000000
+#define fire_const_stepmax 1000000000
 //#define fire_const_stepmax 20
 
 // inner subroutines
