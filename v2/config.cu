@@ -72,10 +72,10 @@ void read_config( FILE *_fio, tpvec *_con, double *_radius, tpbox *_box )
     _box->natom = natom;
     double lx;
     fscanf(_fio, "%le", &lx);
-    _box->lx.x = lx;
-    _box->lx.y = lx;
-    _box->lxinv.x = 1e0/lx;
-    _box->lxinv.y = 1e0/lx;
+    _box->len.x = lx;
+    _box->len.y = lx;
+    _box->leninv.x = 1e0/lx;
+    _box->leninv.y = 1e0/lx;
     _box->strain = 0e0;
 
     for ( int i=0; i<natom; i++ )
@@ -137,7 +137,7 @@ cudaError_t gpu_trim_config( tpvec *_con, tpbox _box )
 
     kernel_trim_config<<< grids, threads >>>( _con, natom, lx, ly );
 
-    check_cuda( cudaDeviceSync() );
+    check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
     }

@@ -26,9 +26,9 @@ cudaError_t gpu_zero_confv( tpvec *thdconfv, tpbox tbox )
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
 
-    kernel_zero_confv <<< grids, threads >>> ( tdconfv, natom );
+    kernel_zero_confv <<< grids, threads >>> ( thdconfv, natom );
 
-    check_cuda( cudaDeviceSync() );
+    check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
     }
@@ -67,24 +67,24 @@ cudaError_t gpu_update_vr( tpvec *thdcon, tpvec *thdconv, tpvec *thdconf, tpbox 
 
     kernel_update_vr <<< grids, threads >>> ( thdcon, thdconv, thdconf, natom, dt );
 
-    check_cuda( cudaDeviceSync() );
+    check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
     }
 
 
-__global__ void kernel_update_v( tpvec *tdconv, tpvec *tdconf, int natom, double hfdt )
+__global__ void kernel_update_v( tpvec *thdconv, tpvec *thdconf, int tnatom, double hfdt )
     {
     const int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if ( i < natom )
+    if ( i < tnatom )
         {
         tpvec va, fa;
         va    = thdconv[i];
         fa    = thdconf[i];
         va.x += fa.x * hfdt;
         va.y += fa.y * hfdt;
-        tdconv[i] = va;
+        thdconv[i] = va;
         }
     }
 
@@ -100,7 +100,7 @@ cudaError_t gpu_update_v( tpvec *thdconv, tpvec *thdconf, tpbox tbox, double dt)
 
     kernel_update_v <<< grids, threads >>> ( thdconv, thdconf, natom, hfdt );
 
-    check_cuda( cudaDeviceSync() );
+    check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
     }
@@ -133,15 +133,15 @@ __global__ void kernel_calc_force( tpvec *thdconf, tponelist *tonelist, tpvec *t
 
         tpvec raj = thdcon[j];
         // dij equal to raidius of atom j
-        double rj = tdradius[j];
+        double rj = thdradius[j];
 
         // xij
         raj.x -= rai.x;
         raj.y -= rai.y;
-        raj.x -= round(raj.x/lx)*lx;
-        raj.y -= round(raj.y/lx)*lx;
+        raj.x -= round(raj.x/tlx)*tlx;
+        raj.y -= round(raj.y/tlx)*tlx;
 
-        double rij = xj*xj + yj*yj; // rij2
+        double rij = raj.x*raj.x + raj.y*raj.y;
         double dij = ri + rj;
 
         if ( rij < dij*dij )
@@ -157,7 +157,7 @@ __global__ void kernel_calc_force( tpvec *thdconf, tponelist *tonelist, tpvec *t
             wi += - Vr * rij;
             }
         }
-    tdconf[i] = fai;
+    thdconf[i] = fai;
 
     atomicAdd( &sm_wili, wi );
 
@@ -175,17 +175,17 @@ cudaError_t gpu_calc_force( tpvec *thdconf, tplist thdlist, tpvec *thdcon, doubl
     const int block_size = 256;
 
     const int natom = tbox.natom;
-    const double lx = tbox.x;
+    const double lx = tbox.len.x;
 
     g_wili = 0.0;
-    check_cuda( cudaDeviceSync() );
+    check_cuda( cudaDeviceSynchronize() );
 
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
 
-    kernel_calc_force <<< grids, threads >>>( thdconf, thdlist.onelists, tdcon, tdradius, natom, lx );
+    kernel_calc_force <<< grids, threads >>>( thdconf, thdlist.onelists, thdcon, thdradius, natom, lx );
 
-    check_cuda( cudaDeviceSync() );
+    check_cuda( cudaDeviceSynchronize() );
 
     *static_press = g_wili / 2.0 / lx / lx;
 
@@ -201,9 +201,9 @@ __global__ void kernel_calc_fmax( tpvec *thdconf, int tnatom )
 
     block_f[tid] = 0.0;
 
-    if ( i < natom )
+    if ( i < tnatom )
         {
-        block_f[tid] = fmax( fabs(tdconf[i].x), fabs(tdconf[i].y) );
+        block_f[tid] = fmax( fabs(thdconf[i].x), fabs(thdconf[i].y) );
         }
 
     __syncthreads();
@@ -237,7 +237,7 @@ double gpu_calc_fmax( tpvec *thdconf, tpbox tbox )
 
     kernel_calc_fmax <<< grids, threads >>> ( thdconf, natom );
 
-    check_cuda( cudaDeviceSync() );
+    check_cuda( cudaDeviceSynchronize() );
 
-    return gsm_fmax;
+    return g_fmax;
     }

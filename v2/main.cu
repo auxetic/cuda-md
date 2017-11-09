@@ -63,9 +63,9 @@ int main(void)
 
     FILE *fio;
     fio = fopen(foutput, "w+");
-        fprintf( fio, "%d %26.16e \n", box.natom, box.x );
+        fprintf( fio, "%d %26.16e \n", box.natom, box.len.x );
         for ( int i=0; i<box.natom; i++ )
-            fprintf( fio, "%26.16e  %26.16e  %26.16e \n", con[i].x*box.xinv, con[i].y*box.yinv, radius[i]*box.xinv );
+            fprintf( fio, "%26.16e  %26.16e  %26.16e \n", con[i].x*box.leninv.x, con[i].y*box.leninv.y, radius[i]*box.leninv.x );
     fclose(fio);
 
     return 0;

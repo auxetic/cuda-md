@@ -1,14 +1,17 @@
 #include "md.h"
 
 // internal function
-__global__ void kernel_calc_chi( tpvec *tdconv, tpvec *tdconf, int natom );
-cudaError_t gpu_calc_chi( tpvec *tdconv, tpvec *tdconf, tpbox tbox, double *chi );
-__global__ void kernel_modify_force( tpvec *tdconf, tpvec *tdconv, int natom, double tchi );
-cudaError_t gpu_modify_force( tpvec *tdconf, tpvec *tdconv, tpbox tbox, double tchi );
+__global__ void kernel_calc_chi( tpvec *thdconv, tpvec *thdconf, int natom );
+cudaError_t gpu_calc_chi( tpvec *thdconv, tpvec *thdconf, tpbox tbox, double *chi );
+__global__ void kernel_modify_force( tpvec *thdconf, tpvec *thdconv, int natom, double tchi );
+cudaError_t gpu_modify_force( tpvec *thdconf, tpvec *thdconv, tpbox tbox, double tchi );
 
 // internal variables
 #define dt 0.01
-tpvec  *dconv, *dconf;
+tpvec  *hdcon, *hdconv, *hdconf;
+double *hdradius;
+tpblocks hdmdblock;
+tplist   hdlist;
 
 // kernel varialbes
 #define BLOCK_SIZE_256  256 
@@ -20,13 +23,24 @@ tpmdset mdset;
 void init_nvt( tpvec *thcon, double *thradius, tpbox tbox, double ttemper )
     {
     // allocate config array
-    cudaMalloc((void **)&dcon    , sizeof(tpvec)  * tbox.natom );
-    cudaMalloc((void **)&dconv   , sizeof(tpvec)  * tbox.natom );
-    cudaMalloc((void **)&dconf   , sizeof(tpvec)  * tbox.natom );
-    cudaMalloc((void **)&dradius , sizeof(double) * tbox.natom );
+    cudaMallocManaged(&hdcon    , sizeof(tpvec)  * tbox.natom );
+    cudaMallocManaged(&hdconv   , sizeof(tpvec)  * tbox.natom );
+    cudaMallocManaged(&hdconf   , sizeof(tpvec)  * tbox.natom );
+    cudaMallocManaged(&hdradius , sizeof(double) * tbox.natom );
 
-    cudaMemcpy(dcon,    thcon,    sizeof(tpvec)*tbox.natom,  cudaMemcpyHostToDevice);
-    cudaMemcpy(dradius, thradius, sizeof(double)*tbox.natom, cudaMemcpyHostToDevice);
+    cudaMemcpy(hdcon,    thcon,    sizeof(tpvec)*tbox.natom,  cudaMemcpyHostToDevice);
+    cudaMemcpy(hdradius, thradius, sizeof(double)*tbox.natom, cudaMemcpyHostToDevice);
+
+    // list
+    hdlist.natom = tbox.natom;
+    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) );
+    calc_nblocks( &hdmdblock, tbox );
+    cudaMallocManaged( &(hdmdblock.oneblocks), hdmdblock.args.nblocks*sizeof(tponeblock) );
+    // make list
+    printf( "making hypercon \n" );
+    gpu_make_hypercon( hdmdblock, hdcon, hdradius, tbox );
+    printf( "making list \n" );
+    gpu_make_list( hdlist, hdmdblock, hdcon, tbox );
 
     mdset.temper = ttemper;
     }
@@ -36,32 +50,32 @@ void gpu_run_nvt( tpbox tbox, double ttemper, int steps )
     for ( int step=1; step <= steps; step++ )
         {
         // check and make list
-        if ( gpu_check_list( dcon, tbox, dlist ) )
+        if ( gpu_check_list( hdlist, hdcon, tbox ) )
             {
             printf( "making list \n" );
-            gpu_make_hypercon( dcon, dradius, tbox, dblocks, hblockset );
-            gpu_make_list( dlist, dblocks, dcon, hblockset, tbox );
+            gpu_make_hypercon( hdmdblock, hdcon, hdradius, tbox );
+            gpu_make_list( hdlist, hdmdblock, hdcon, tbox );
             }
 
         // velocity verlet / integrate veclocity and config
-        gpu_update_vr( dcon, dconv, dconf, tbox, dt );
+        gpu_update_vr( hdcon, hdconv, hdconf, tbox, dt );
 
         // temp
         double press;
         // calc force
-        gpu_calc_force( dlist, dcon, dradius, dconf, &press, tbox );
+        gpu_calc_force( hdconf, hdlist, hdcon, hdradius, &press, tbox );
 
         // nvt / modify force
         double chi;
-        gpu_calc_chi( dconv, dconf, tbox, &chi );
-        gpu_modify_force( dconf, dconv, tbox, chi );
+        gpu_calc_chi( hdconv, hdconf, tbox, &chi );
+        gpu_modify_force( hdconf, hdconv, tbox, chi );
 
         // velocity verlet / integrate velocity
-        gpu_update_v( dconv, dconf, tbox, dt );
+        gpu_update_v( hdconv, hdconf, tbox, dt );
         }
     }
 
-cudaError_t gpu_calc_chi( tpvec *tdconv, tpvec *tdconf, tpbox tbox, double *chi )
+cudaError_t gpu_calc_chi( tpvec *thdconv, tpvec *thdconf, tpbox tbox, double *chi )
     {
     const int block_size = 256;
     const int natom = tbox.natom;
@@ -69,7 +83,7 @@ cudaError_t gpu_calc_chi( tpvec *tdconv, tpvec *tdconf, tpbox tbox, double *chi 
     dim3 grids( ceil( natom / block_size )+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
 
-    kernel_calc_chi <<< grids, threads >>> ( tdconv, tdconf, natom );
+    kernel_calc_chi <<< grids, threads >>> ( thdconv, thdconf, natom );
 
     cudaError_t err;
     err = cudaDeviceSynchronize();
@@ -85,7 +99,7 @@ cudaError_t gpu_calc_chi( tpvec *tdconv, tpvec *tdconf, tpbox tbox, double *chi 
     return err;
     }
 
-__global__ void kernel_calc_chi( tpvec *tdconv, tpvec *tdconf, int natom )
+__global__ void kernel_calc_chi( tpvec *thdconv, tpvec *thdconf, int natom )
     {
     __shared__ double spp[BLOCK_SIZE_256];
     __shared__ double spf[BLOCK_SIZE_256];
@@ -98,10 +112,10 @@ __global__ void kernel_calc_chi( tpvec *tdconv, tpvec *tdconf, int natom )
 
     if ( i < natom )
         {
-        double fxi = tdconf[i].x;
-        double fyi = tdconf[i].y;
-        double vxi = tdconv[i].x;
-        double vyi = tdconv[i].y;
+        double fxi = thdconf[i].x;
+        double fyi = thdconf[i].y;
+        double vxi = thdconv[i].x;
+        double vyi = thdconv[i].y;
         spp[i] = vxi * vxi + vyi * vyi;
         spf[i] = vxi * fxi + vyi * fyi;
         }
@@ -127,7 +141,7 @@ __global__ void kernel_calc_chi( tpvec *tdconv, tpvec *tdconf, int natom )
 
     }
 
-cudaError_t gpu_modify_force( tpvec *tdconf, tpvec *tdconv, tpbox tbox, double tchi )
+cudaError_t gpu_modify_force( tpvec *thdconf, tpvec *thdconv, tpbox tbox, double tchi )
     {
     const int block_size = 256;
     const int natom = tbox.natom;
@@ -135,7 +149,7 @@ cudaError_t gpu_modify_force( tpvec *tdconf, tpvec *tdconv, tpbox tbox, double t
     dim3 grids( ceil(natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
     
-    kernel_modify_force <<< grids, threads >>> ( tdconf, tdconv, natom, tchi );
+    kernel_modify_force <<< grids, threads >>> ( thdconf, thdconv, natom, tchi );
 
     cudaError_t err;
     err = cudaDeviceSynchronize();
@@ -149,15 +163,15 @@ cudaError_t gpu_modify_force( tpvec *tdconf, tpvec *tdconv, tpbox tbox, double t
     return err;
     }
 
-__global__ void kernel_modify_force( tpvec *tdconf, tpvec *tdconv, int natom, double tchi )
+__global__ void kernel_modify_force( tpvec *thdconf, tpvec *thdconv, int natom, double tchi )
     {
     const int tid = threadIdx.x;
     const int i   = tid + blockIdx.x * blockDim.x;
 
     if ( i < natom )
         {
-        tdconf[i].x = tdconf[i].x - tchi * tdconv[i].x;
-        tdconf[i].y = tdconf[i].y - tchi * tdconv[i].y;
+        thdconf[i].x = thdconf[i].x - tchi * thdconv[i].x;
+        thdconf[i].y = thdconf[i].y - tchi * thdconv[i].y;
         }
 
     }

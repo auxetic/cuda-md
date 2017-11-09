@@ -36,9 +36,9 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
     memcpy( hdradius, tradius, firebox.natom*sizeof(double) );
 
     // init list
-    tplist hdlist, hlist;
+    tplist hdlist; //hlist;
     hdlist.natom = firebox.natom;
-    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) )
+    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) );
     // hypercon
     tpblocks hdblock;
     calc_nblocks( &hdblock, firebox );
@@ -60,7 +60,7 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
 
     // force
     double press;
-    gpu_calc_force( dlist, dcon, dradius, dconf, &press, firebox );
+    gpu_calc_force( hdconf, hdlist, hdcon, hdradius, &press, firebox );
 
     double dt, fire_beta;
     dt = fire_const_dt0;
@@ -84,7 +84,7 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
         gpu_update_vr( hdcon, hdconv, hdconf, firebox, dt );
 
         // calc force
-        gpu_calc_force( dlist, dcon, dradius, dconf, &press, firebox );
+        gpu_calc_force( hdconf, hdlist, hdcon, hdradius, &press, firebox );
 
         // velocity verlet / integrate velocity
         gpu_update_v( hdconv, hdconf, firebox, dt );
@@ -137,8 +137,8 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
 
     memcpy( tcon, hdcon, firebox.natom*sizeof(tpvec) );
 
-    cudaFree( hdblocks );
-    cudaFree( hdlist );
+    cudaFree( hdblock.oneblocks );
+    cudaFree( hdlist.onelists );
     cudaFree( hdcon  );
     cudaFree( hdconv );
     cudaFree( hdconf );
@@ -161,9 +161,9 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_pre
     memcpy( hdradius, tradius, firebox.natom*sizeof(double) );
 
     // init list
-    tplist hdlist, hlist;
+    tplist hdlist; //hlist;
     hdlist.natom = firebox.natom;
-    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) )
+    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) );
     // hypercon
     tpblocks hdblock;
     calc_nblocks( &hdblock, firebox );
@@ -180,7 +180,7 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_pre
 
     // force
     double press;
-    gpu_calc_force( hdconf, hdlist, hdcon, hdradius, dconf, &press, firebox );
+    gpu_calc_force( hdconf, hdlist, hdcon, hdradius, &press, firebox );
 
     double dt, fire_beta;
     dt = fire_const_dt0;
@@ -206,7 +206,7 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_pre
         gpu_firecp_update_box( hdcon, &firebox, dt, press, target_press, &lv, step );
 
         // calc force
-        gpu_calc_force( dlist, dcon, dradius, dconf, &press, firebox );
+        gpu_calc_force( hdconf, hdlist, hdcon, hdradius, &press, firebox );
 
         // velocity verlet / integrate velocity
         gpu_update_v( hdconv, hdconf, firebox, dt );
@@ -255,7 +255,7 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_pre
             }
 
         if ( step%100 == 0 )
-            printf( "step=%0.6d, f=%16.6e, p=%26.16e, l=%26.16e, dt=%16.6e \n", step, g_fire_fmax, press, firebox.x, dt );
+            printf( "step=%0.6d, f=%16.6e, p=%26.16e, l=%26.16e, dt=%16.6e \n", step, g_fire_fmax, press, firebox.len.x, dt );
 
         }
 
@@ -263,8 +263,8 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_pre
 
     *tbox0 = firebox;
 
-    cudaFree( hdblocks );
-    cudaFree( hdlist );
+    cudaFree( hdblock.oneblocks );
+    cudaFree( hdlist.onelists );
     cudaFree( hdcon  );
     cudaFree( hdconv );
     cudaFree( hdconf );
@@ -288,7 +288,7 @@ __global__ void kernel_calc_fire_para( tpvec *thdconv, tpvec *thdconf, int tnato
     sm_power[tid] = 0.0;
     sm_fmax[tid]  = 0.0;
 
-    if ( i < natom )
+    if ( i < tnatom )
         {
         double fx, fy, vx, vy;
         fx = thdconf[i].x;
@@ -342,7 +342,7 @@ cudaError_t gpu_calc_fire_para( tpvec *thdconv, tpvec *thdconf, tpbox tbox )
 
     kernel_calc_fire_para <<< grids, threads >>> ( thdconv, thdconf, natom );
 
-    check_cuda( cudaDeviceSync() );
+    check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
     }
@@ -351,7 +351,7 @@ __global__ void kernel_fire_modify_v( tpvec *thdconv, tpvec *thdconf, int tnatom
     {
     const int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if ( i < natom )
+    if ( i < tnatom )
         {
         double v, f;
 
@@ -378,16 +378,16 @@ cudaError_t gpu_fire_modify_v( tpvec *thdconv, tpvec *thdconf, double tfire_onem
 
     kernel_fire_modify_v <<< grids, threads >>> ( thdconv, thdconf, natom, tfire_onemb, tfire_betamvndfn );
 
-    check_cuda( cudaDeviceSync() );
+    check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
     }
 
-__global__ void kernel_firecp_update_box( tpvec *thdcon, double tscale, int natom )
+__global__ void kernel_firecp_update_box( tpvec *thdcon, double tscale, int tnatom )
     {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if ( i >= natom )
+    if ( i >= tnatom )
         return;
 
     double rx = thdcon[i].x;
@@ -403,24 +403,24 @@ cudaError_t gpu_firecp_update_box( tpvec *thdcon, tpbox *firebox, double dt, dou
     const int block_size = 1024;
     const int natom = firebox->natom;
 
-    double l = firebox->x;
+    double l = firebox->len.x;
     double lf = ( current_press - target_press ) * target_press ;
 
     l += *lv * dt + lf * dt * dt * 0.5;
     *lv += lf * dt * 0.5;
 
-    double scale = l / firebox->x;
-    firebox->x = l;
-    firebox->y = l;
-    firebox->xinv = 1.0 / l;
-    firebox->yinv = 1.0 / l;
+    double scale = l / firebox->len.x;
+    firebox->len.x = l;
+    firebox->len.y = l;
+    firebox->leninv.x = 1.0 / l;
+    firebox->leninv.y = 1.0 / l;
 
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
 
     kernel_firecp_update_box<<< grids, threads >>>( thdcon, scale, natom );
 
-    check_cuda( cudaDeviceSync() );
+    check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
     }
