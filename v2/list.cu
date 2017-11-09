@@ -51,30 +51,28 @@ __global__ void kernel_init_hypercon( tponeblock *tdoneblocks, int tnblocks )
     }
 
 // kernel subroutine for making hyperconfig
-__global__ void kernel_make_hypercon( tponeblock  *tdoneblocks,
-                                      int     tnblockx,
-                                      double  tdlx,
-                                      tpvec   *tdcon,
-                                      double  *tdradius,
-                                      double  tlx,
-                                      int     tnatom )
+__global__ void kernel_make_hypercon( tponeblock *tdoneblocks,
+                                      int    tnblockx,
+                                      double tdlx,
+                                      tpvec  *tdcon,
+                                      double *tdradius,
+                                      double tlx,
+                                      int    tnatom )
     {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     if ( i >= tnatom )
         return;
 
-    double xi, yi, ri;
-    xi = tdcon[i].x;
-    yi = tdcon[i].y;
-    ri = tdradius[i];
+    tpvec  rai = tdcon[i];
+    double ri  = tdradius[i];
 
-    xi -= round( xi / tlx ) * tlx;
-    yi -= round( yi / tlx ) * tlx;
+    rai.x -= round( rai.x / tlx ) * tlx;
+    rai.y -= round( rai.y / tlx ) * tlx;
 
     int bidx, bidy, bid;
-    bidx = (int)floor( (xi+0.5*tlx) / tdlx );
-    bidy = (int)floor( (yi+0.5*tlx) / tdlx );
+    bidx = (int)floor( (rai.x+0.5*tlx) / tdlx );
+    bidy = (int)floor( (rai.y+0.5*tlx) / tdlx );
     bid  = bidx + bidy * tnblockx;
 
     int idxtemp = atomicAdd( &tdoneblocks[bid].natom, 1 );
@@ -111,7 +109,6 @@ cudaError_t gpu_make_hypercon( tpblocks thdblock, tpvec *thdcon, double *thdradi
     // main
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
-
     kernel_make_hypercon <<< grids, threads >>>(thdblock.oneblocks,
                                                 nblockx,
                                                 dlx,
@@ -146,7 +143,7 @@ __global__ void kernel_make_list( tponelist *tonelist, tponeblock *toneblocks, d
     int bidy = blockIdx.y;
     int bid  = bidx + bidy * gridDim.x;
 
-    if ( tid == 0 ) 
+    if ( tid == 0 )
         center_block = toneblocks[bid];
     __syncthreads();
 
@@ -218,14 +215,13 @@ cudaError_t gpu_make_list( tplist   thdlist,
     dim3 grids(nblockx,nblocky,1);
     dim3 threads(maxn_of_block,1,1);
     kernel_make_list <<< grids, threads >>> ( thdlist.onelists, thdblock.oneblocks, lx );
-
     check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
     }
 
-__device__ bool device_nb_ornot( double xi, double yi, double ri, 
-                                 double xj, double yj, double rj, 
+__device__ bool device_nb_ornot( double xi, double yi, double ri,
+                                 double xj, double yj, double rj,
                                  double lx)
     {
     double xij, yij, dij;
@@ -255,14 +251,14 @@ __global__ void kernel_make_list_fallback( tponelist *tonelist, tpvec *tdcon, do
 
     double xi, yi, ri;
     if ( i < tnatom ) {
-        xi = tdcon[i].x; 
-        yi = tdcon[i].y; 
+        xi = tdcon[i].x;
+        yi = tdcon[i].y;
         ri = tradius[i];
         }
     else{
-        xi = 0.0; 
-        yi = 0.0; 
-        ri = 0.0; 
+        xi = 0.0;
+        yi = 0.0;
+        ri = 0.0;
         }
     __syncthreads();
 
@@ -306,13 +302,11 @@ cudaError_t gpu_make_list_fallback( tplist thdlist, tpvec *thdcon, double *thdra
     const int natom = tbox.natom;
 
     kernel_zero_list <<< (natom/block_size)+1, block_size >>> ( thdlist.onelists, thdcon, natom, lx );
-
     check_cuda( cudaDeviceSynchronize() );
 
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( maxn_of_block, 1, 1 );
     kernel_make_list_fallback <<< grids, threads >>> ( thdlist.onelists, thdcon, thdradius, natom, lx );
-
     check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
@@ -322,7 +316,7 @@ cudaError_t gpu_make_list_fallback( tplist thdlist, tpvec *thdcon, double *thdra
 __global__ void kernel_check_list(  tponelist *tonelist,
                                     tpvec     *tdcon,
                                     int       tnatom,
-                                    double    lx, 
+                                    double    lx,
                                     double    ly )
     {
     __shared__ int block_need_remake;
@@ -358,13 +352,11 @@ __global__ void kernel_check_list(  tponelist *tonelist,
         if ( block_need_remake == 1 )
             need_remake = 1;
         }
-
     }
 
 // host subroutine used for checking list
 bool gpu_check_list( tplist thdlist, tpvec *tdcon, tpbox tbox )
     {
-
     need_remake = 0;
 
     const int block_size = 512;
@@ -374,11 +366,10 @@ bool gpu_check_list( tplist thdlist, tpvec *tdcon, tpbox tbox )
 
     dim3  grids( (tbox.natom/block_size)+1, 1, 1 );
     dim3  threads( block_size, 1, 1 );
-
     kernel_check_list <<< grids, threads >>> ( thdlist.onelists,
                                                tdcon,
                                                natom,
-                                               lx, 
+                                               lx,
                                                ly);
     check_cuda( cudaDeviceSynchronize() );
 
@@ -435,7 +426,7 @@ int cpu_make_list( tplist tlist, tpvec *tcon, double *tradius, tpbox tbox )
 
             int itemp;
             itemp = tlist.onelists[i].nbsum;
-            if ( itemp == listmax - 2 ) 
+            if ( itemp == listmax - 2 )
                 continue;
 
             tlist.onelists[i].nb[itemp] = j;
