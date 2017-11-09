@@ -15,7 +15,7 @@
 
 #define nlcut         0.8e0
 #define listmax       64
-#define maxn_of_block 256
+#define maxn_of_block 128
 #define mean_of_block 64
 
 // type define

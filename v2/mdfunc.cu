@@ -148,7 +148,7 @@ __global__ void kernel_calc_force( tpvec *thdconf, tponelist *tonelist, tpvec *t
             {
             rij = sqrt(rij);
 
-            double Vr = ( 1.0 - rij/dij ) / dij;
+            double Vr = - ( 1.0 - rij/dij ) / dij;
 
             fai.x -= - Vr * raj.x / rij;
             fai.y -= - Vr * raj.y / rij;

@@ -26,7 +26,7 @@ int main(void)
     //scanf("%s",  foutput_bak );
     // test
     deviceno = 0;
-    natom = 10000;
+    natom = 1000;
     seed = 1;
     press = 1.e-2;
     strcpy(foutput, "con.dat");
@@ -65,7 +65,7 @@ int main(void)
     fio = fopen(foutput, "w+");
         fprintf( fio, "%d %26.16e \n", box.natom, box.len.x );
         for ( int i=0; i<box.natom; i++ )
-            fprintf( fio, "%26.16e  %26.16e  %26.16e \n", con[i].x*box.leninv.x, con[i].y*box.leninv.y, radius[i]*box.leninv.x );
+            fprintf( fio, "%26.16e  %26.16e  %26.16e \n", con[i].x, con[i].y, radius[i] );
     fclose(fio);
 
     return 0;

@@ -36,7 +36,7 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
     memcpy( hdradius, tradius, firebox.natom*sizeof(double) );
 
     // init list
-    tplist hdlist; //hlist;
+    tplist hdlist;
     hdlist.natom = firebox.natom;
     cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) );
     // hypercon
@@ -48,11 +48,12 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
     gpu_make_hypercon( hdblock, hdcon, hdradius, firebox );
     printf( "making list \n" );
     gpu_make_list( hdlist, hdblock, hdcon, firebox );
-    //gpu_make_list_fallback( hdlist, hdcon, dradius, firebox );
     // test
+    //tplist hlist;
     //hlist.natom = firebox.natom;
-    //cudaMallocManaged( &(hlist.onelists), hlist.natom*sizeof(tponelist) )
-    //cpu_make_list( hlist, hdcon, tradius, firebox );
+    //cudaMallocManaged( &(hlist.onelists), hlist.natom*sizeof(tponelist) );
+    ////cpu_make_list( hlist, hdcon, tradius, firebox );
+    //gpu_make_list_fallback( hlist, hdcon, hdradius, firebox );
 
     // init fire
     gpu_zero_confv( hdconv, firebox );
@@ -96,7 +97,6 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
         gpu_calc_fire_para( hdconv, hdconf, firebox );
 
         double ffmax = gpu_calc_fmax( hdconf, firebox );
-        printf( "%f\n", ffmax );
 
         if ( g_fire_fmax < fire_const_fmax )
             {
@@ -108,8 +108,6 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
         fire_onemb = 1.0 - fire_beta;
         fire_vndfn = sqrt( g_fire_vn2 / g_fire_fn2 );
         fire_betamvndfn = fire_beta * fire_vndfn;
-
-       //cudaMemcpy( hconv, dconv, firebox.natom*sizeof(tpvec), cudaMemcpyDeviceToHost );
 
         if ( g_fire_power >= 0.0 )
             {
@@ -130,7 +128,7 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
             gpu_zero_confv( hdconv, firebox );
             }
 
-        if ( step%1 == 0 )
+        if ( step%100 == 0 )
             printf( "step=%0.6d, fmax=%16.6e, press=%16.6e, dt=%16.6e \n", step, g_fire_fmax, press, dt );
 
         }

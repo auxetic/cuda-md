@@ -154,8 +154,6 @@ __global__ void kernel_make_list( tponelist *tonelist, tponeblock *toneblocks, d
         {
         for ( int biy=-1; biy<=1; biy++ )
             {
-            if ( bix==0 && biy==0 ) continue;
-
             __shared__ intd wrap;
             if ( tid == 0 )
                 {
@@ -191,11 +189,13 @@ __global__ void kernel_make_list( tponelist *tonelist, tponeblock *toneblocks, d
                         inatom = center_block.tag[tid];
                         ilist  = tonelist[inatom].nbsum;
                         if ( ilist == listmax - 2 ) continue;
+                        if ( center_block.tag[tid] == nb_block.tag[jj] ) continue;
                         tonelist[inatom].nb[ilist] = nb_block.tag[jj];
                         tonelist[inatom].nbsum += 1;
                         }
                     }
                 }
+            __syncthreads();
             }
         }
     }
@@ -270,7 +270,7 @@ __global__ void kernel_make_list_fallback( tponelist *tonelist, tpvec *tdcon, do
         {
         int joffset = blocki * const_256;
         int j = tid + joffset;
-        __syncthreads();
+
         if ( j < tnatom )
             {
             xj[tid] = tdcon[j].x;
@@ -299,7 +299,7 @@ __global__ void kernel_make_list_fallback( tponelist *tonelist, tpvec *tdcon, do
     }
 
 // host subroutine used for makelist
-cudaError_t gpu_make_list_fallback( tplist thdlist, tpvec *thdcon, double *thradius, tpbox tbox )
+cudaError_t gpu_make_list_fallback( tplist thdlist, tpvec *thdcon, double *thdradius, tpbox tbox )
     {
     const int block_size = const_256;
     const double lx = tbox.len.x;
@@ -311,7 +311,7 @@ cudaError_t gpu_make_list_fallback( tplist thdlist, tpvec *thdcon, double *thrad
 
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( maxn_of_block, 1, 1 );
-    kernel_make_list_fallback <<< grids, threads >>> ( thdlist.onelists, thdcon, thradius, natom, lx );
+    kernel_make_list_fallback <<< grids, threads >>> ( thdlist.onelists, thdcon, thdradius, natom, lx );
 
     check_cuda( cudaDeviceSynchronize() );
 
