@@ -130,7 +130,7 @@ cudaError_t gpu_trim_config( tpvec *tcon, tpbox tbox )
     const double lx    = tbox.len.x;
     const double ly    = tbox.len.y;
 
-    const int    block_size = 256;
+    const int    blockt_ize = 256;
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
 
@@ -139,43 +139,3 @@ cudaError_t gpu_trim_config( tpvec *tcon, tpbox tbox )
 
     return cudaSuccess;
     }
-
-//// copy config from host to device
-    //cudaError_t trans_con_to_gpu( tpvec *tdcon, double *tdradius, int tnatom,
-    //                              tpvec *thcon, double *thradius )
-    //    {
-    //    cudaError_t err;
-    //    err = cudaMemcpy(tdcon, thcon, tnatom*sizeof(tpvec), cudaMemcpyHostToDevice);
-    //    if ( err != cudaSuccess )
-    //        {
-    //        fprintf(stderr,"cudaMemcpy failed in %s, %d, err=%d\n", __FILE__, __LINE__, err);
-    //        exit(-1);
-    //        }
-    //    err = cudaMemcpy(tdradius, thradius, tnatom*sizeof(double), cudaMemcpyHostToDevice);
-    //    if ( err != cudaSuccess )
-    //        {
-    //        fprintf(stderr,"cudaMemcpy failed in %s, %d, err=%d\n", __FILE__, __LINE__, err);
-    //        exit(-1);
-    //        }
-    //    return cudaSuccess;
-    //    }
-
-//// copy config from device to host
-    //cudaError_t trans_con_to_host( tpvec *thcon, double *thradius, int tnatom,
-    //                               tpvec *tdcon, double *tdradius )
-    //    {
-    //    cudaError_t err;
-    //    err = cudaMemcpy(thcon, tdcon, tnatom*sizeof(tpvec), cudaMemcpyDeviceToHost);
-    //    if ( err != cudaSuccess )
-    //        {
-    //        fprintf(stderr,"cudaMemcpy failed in %s, %d\n", __FILE__, __LINE__);
-    //        exit(-1);
-    //        }
-    //    err = cudaMemcpy(thradius, tdradius, tnatom*sizeof(double), cudaMemcpyDeviceToHost);
-    //    if ( err != cudaSuccess )
-    //        {
-    //        fprintf(stderr,"cudaMemcpy failed in %s, %d\n", __FILE__, __LINE__);
-    //        exit(-1);
-    //        }
-    //    return cudaSuccess;
-    //    }

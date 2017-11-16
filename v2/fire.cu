@@ -267,7 +267,6 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_pre
     cudaFree( hdconv );
     cudaFree( hdconf );
     cudaFree( hdradius );
-
     }
 
 __global__ void kernel_calc_fire_para( tpvec *thdconv, tpvec *thdconf, int tnatom )
@@ -337,9 +336,7 @@ cudaError_t gpu_calc_fire_para( tpvec *thdconv, tpvec *thdconf, tpbox tbox )
 
     dim3 grids( ( natom / block_size )+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
-
     kernel_calc_fire_para <<< grids, threads >>> ( thdconv, thdconf, natom );
-
     check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
@@ -373,9 +370,7 @@ cudaError_t gpu_fire_modify_v( tpvec *thdconv, tpvec *thdconf, double tfire_onem
 
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
-
     kernel_fire_modify_v <<< grids, threads >>> ( thdconv, thdconf, natom, tfire_onemb, tfire_betamvndfn );
-
     check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
@@ -415,9 +410,7 @@ cudaError_t gpu_firecp_update_box( tpvec *thdcon, tpbox *firebox, double dt, dou
 
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
-
     kernel_firecp_update_box<<< grids, threads >>>( thdcon, scale, natom );
-
     check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;

@@ -14,7 +14,7 @@ tpblocks hdmdblock;
 tplist   hdlist;
 
 // kernel varialbes
-#define BLOCK_SIZE_256  256 
+#define BLOCK_SIZE_256  256
 __managed__ double mpp, mpf;
 
 tpmdset mdset;
@@ -44,7 +44,7 @@ void init_nvt( tpvec *thcon, double *thradius, tpbox tbox, double ttemper )
 
     mdset.temper = ttemper;
     }
-    
+
 void gpu_run_nvt( tpbox tbox, double ttemper, int steps )
     {
     for ( int step=1; step <= steps; step++ )
@@ -82,21 +82,12 @@ cudaError_t gpu_calc_chi( tpvec *thdconv, tpvec *thdconf, tpbox tbox, double *ch
 
     dim3 grids( ceil( natom / block_size )+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
-
     kernel_calc_chi <<< grids, threads >>> ( thdconv, thdconf, natom );
+    check_cuda( cudaDeviceSynchronize() );
 
-    cudaError_t err;
-    err = cudaDeviceSynchronize();
-
-    if ( err != cudaSuccess )
-        {
-        fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
-        exit(-1);
-        }
-    
     *chi = mpf/mpp;
 
-    return err;
+    return cudaSuccess;
     }
 
 __global__ void kernel_calc_chi( tpvec *thdconv, tpvec *thdconf, int natom )
@@ -138,7 +129,6 @@ __global__ void kernel_calc_chi( tpvec *thdconv, tpvec *thdconf, int natom )
         atomicAdd( &mpp, spp[0] );
         atomicAdd( &mpf, spf[0] );
         }
-
     }
 
 cudaError_t gpu_modify_force( tpvec *thdconf, tpvec *thdconv, tpbox tbox, double tchi )
@@ -148,19 +138,10 @@ cudaError_t gpu_modify_force( tpvec *thdconf, tpvec *thdconv, tpbox tbox, double
 
     dim3 grids( ceil(natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
-    
     kernel_modify_force <<< grids, threads >>> ( thdconf, thdconv, natom, tchi );
+    check_cuda( cudaDeviceSynchronize() );
 
-    cudaError_t err;
-    err = cudaDeviceSynchronize();
-
-    if ( err != cudaSuccess )
-        {
-        fprintf(stderr, "cudaDeviceSync failed, %s, %d, err = %d\n", __FILE__, __LINE__, err);
-        exit(-1);
-        }
-    
-    return err;
+    return cudaSuccess;
     }
 
 __global__ void kernel_modify_force( tpvec *thdconf, tpvec *thdconv, int natom, double tchi )
@@ -173,6 +154,5 @@ __global__ void kernel_modify_force( tpvec *thdconf, tpvec *thdconv, int natom, 
         thdconf[i].x = thdconf[i].x - tchi * thdconv[i].x;
         thdconf[i].y = thdconf[i].y - tchi * thdconv[i].y;
         }
-
     }
 
