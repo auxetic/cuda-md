@@ -26,13 +26,13 @@ int main(void)
     //scanf("%s",  foutput_bak );
     // test
     deviceno = 0;
-    natom = 1000;
+    natom = 1000000;
     seed = 1;
     press = 1.e-2;
     strcpy(foutput, "con.dat");
     strcpy(foutput_bak, "con.dat.bak");
 
-    cudaSetDevice(deviceno);
+    //cudaSetDevice(deviceno);
     // set
     box.natom = natom;
     box.phi   = 0.88;

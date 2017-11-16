@@ -4,6 +4,6 @@
 #include <cuda.h>
 
 __device__ double atomicMax(double *address, double val);
-//__device__ float  atomicMax(float  *address, float  val);
+__device__ float  atomicMax(float  *address, float  val);
 
 #endif

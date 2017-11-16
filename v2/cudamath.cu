@@ -1,6 +1,8 @@
 #include "cudamath.h"
 
 // device subroutine
+
+// overload atomicMax for double and float
 __device__ double atomicMax(double* address, double val)
     {
     unsigned long long int* address_as_ull = (unsigned long long int*)address;
@@ -14,6 +16,8 @@ __device__ double atomicMax(double* address, double val)
         } while (assumed != old);
     return __longlong_as_double(old);
     }
+
+// overload atomicMax for double and float
 __device__ float atomicMax(float* address, float val)
     {
     unsigned int* address_as_i = (unsigned int*) address;
@@ -27,5 +31,3 @@ __device__ float atomicMax(float* address, float val)
     } while (assumed != old);
     return __int_as_float(old);
     }
-
-

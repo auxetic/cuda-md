@@ -21,12 +21,12 @@ extern tpvec  *dcon;
 extern double *dradius;
 
 // subroutines
-void alloc_con( tpvec **_con, double **_radius, int _natom );
-void gen_config( tpvec *_con, double *_radius, tpbox *_box, tpsets _sets );
-void read_config( FILE *_fio, tpvec *_con, double *_radius, tpbox *_box );
-void trim_config( tpvec *_con, tpbox _box );
+void alloc_con( tpvec **tcon, double **tradius, int tnatom );
+void gen_config( tpvec *tcon, double *tradius, tpbox *tbox, tpsets tsets );
+void read_config( FILE *tfio, tpvec *tcon, double *tradius, tpbox *tbox );
+void trim_config( tpvec *tcon, tpbox tbox );
 
-cudaError_t device_alloc_con( tpvec **_con, double **_radius, int _natom );
-cudaError_t gpu_trim_config( tpvec *_con, tpbox _box );
+cudaError_t device_alloc_con( tpvec **tcon, double **tradius, int tnatom );
+cudaError_t gpu_trim_config( tpvec *tcon, tpbox tbox );
 
 #endif
