@@ -79,8 +79,8 @@ __global__ void kernel_make_hypercon( tponeblock *tdoneblocks,
 
     if ( idxtemp < maxn_of_block-2 )
         {
-        tdoneblocks[bid].rx[idxtemp]     = xi;
-        tdoneblocks[bid].ry[idxtemp]     = yi;
+        tdoneblocks[bid].rx[idxtemp]     = rai.x;
+        tdoneblocks[bid].ry[idxtemp]     = rai.y;
         tdoneblocks[bid].radius[idxtemp] = ri;
         tdoneblocks[bid].tag[idxtemp]    = i;
         }

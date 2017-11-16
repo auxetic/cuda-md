@@ -130,7 +130,7 @@ cudaError_t gpu_trim_config( tpvec *tcon, tpbox tbox )
     const double lx    = tbox.len.x;
     const double ly    = tbox.len.y;
 
-    const int    blockt_ize = 256;
+    const int    block_size = 256;
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
 
