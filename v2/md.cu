@@ -107,8 +107,8 @@ __global__ void kernel_calc_chi( tpvec *thdconv, tpvec *thdconf, int natom )
         double fyi = thdconf[i].y;
         double vxi = thdconv[i].x;
         double vyi = thdconv[i].y;
-        spp[i] = vxi * vxi + vyi * vyi;
-        spf[i] = vxi * fxi + vyi * fyi;
+        spp[tid] = vxi * vxi + vyi * vyi;
+        spf[tid] = vxi * fxi + vyi * fyi;
         }
 
     int j = blockDim.x;
@@ -155,4 +155,3 @@ __global__ void kernel_modify_force( tpvec *thdconf, tpvec *thdconv, int natom, 
         thdconf[i].y = thdconf[i].y - tchi * thdconv[i].y;
         }
     }
-
