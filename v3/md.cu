@@ -2,9 +2,9 @@
 
 // internal function
 __global__ void kernel_calc_chi( vec_t *thdconv, vec_t *thdconf, int natom );
-cudaError_t gpu_calc_chi( vec_t *thdconv, vec_t *thdconf, tpbox tbox, double *chi );
+cudaError_t gpu_calc_chi( vec_t *thdconv, vec_t *thdconf, box_t tbox, double *chi );
 __global__ void kernel_modify_force( vec_t *thdconf, vec_t *thdconv, int natom, double tchi );
-cudaError_t gpu_modify_force( vec_t *thdconf, vec_t *thdconv, tpbox tbox, double tchi );
+cudaError_t gpu_modify_force( vec_t *thdconf, vec_t *thdconv, box_t tbox, double tchi );
 
 // internal variables
 #define dt 0.01
@@ -20,7 +20,7 @@ __managed__ double mpp, mpf;
 tpmdset mdset;
 
 
-void init_nvt( vec_t *thcon, double *thradius, tpbox tbox, double ttemper )
+void init_nvt( vec_t *thcon, double *thradius, box_t tbox, double ttemper )
     {
     // allocate config array
     cudaMallocManaged(&hdcon    , sizeof(vec_t)  * tbox.natom );
@@ -45,7 +45,7 @@ void init_nvt( vec_t *thcon, double *thradius, tpbox tbox, double ttemper )
     mdset.temper = ttemper;
     }
 
-void gpu_run_nvt( tpbox tbox, double ttemper, int steps )
+void gpu_run_nvt( box_t tbox, double ttemper, int steps )
     {
     for ( int step=1; step <= steps; step++ )
         {
@@ -75,7 +75,7 @@ void gpu_run_nvt( tpbox tbox, double ttemper, int steps )
         }
     }
 
-cudaError_t gpu_calc_chi( vec_t *thdconv, vec_t *thdconf, tpbox tbox, double *chi )
+cudaError_t gpu_calc_chi( vec_t *thdconv, vec_t *thdconf, box_t tbox, double *chi )
     {
     const int block_size = 256;
     const int natom = tbox.natom;
@@ -131,7 +131,7 @@ __global__ void kernel_calc_chi( vec_t *thdconv, vec_t *thdconf, int natom )
         }
     }
 
-cudaError_t gpu_modify_force( vec_t *thdconf, vec_t *thdconv, tpbox tbox, double tchi )
+cudaError_t gpu_modify_force( vec_t *thdconf, vec_t *thdconv, box_t tbox, double tchi )
     {
     const int block_size = 256;
     const int natom = tbox.natom;

@@ -59,12 +59,12 @@ extern tpblocks hdblocks;
 extern tplist  *dlist;
 
 // subroutines
-void calc_nblocks( tpblocks *thdblocks, tpbox tbox );
-void recalc_nblocks( tpblocks *thdblocks, tpbox tbox );
-cudaError_t gpu_make_hypercon( tpblocks thdblocks, vec_t *tdcon, double *tdradius, tpbox tbox );
-cudaError_t gpu_make_list( tplist thdlist, tpblocks thdblocks, vec_t *tdcon, tpbox tbox );
-cudaError_t gpu_make_list_fallback( tplist thdlist, vec_t *tdcon, double *tradius, tpbox tbox );
-bool gpu_check_list( tplist thdlist, vec_t *tdcon, tpbox tbox );
-int cpu_make_list( tplist tlist, vec_t *tcon, double *tradius, tpbox tbox );
+void calc_nblocks( tpblocks *thdblocks, box_t tbox );
+void recalc_nblocks( tpblocks *thdblocks, box_t tbox );
+cudaError_t gpu_make_hypercon( tpblocks thdblocks, vec_t *tdcon, double *tdradius, box_t tbox );
+cudaError_t gpu_make_list( tplist thdlist, tpblocks thdblocks, vec_t *tdcon, box_t tbox );
+cudaError_t gpu_make_list_fallback( tplist thdlist, vec_t *tdcon, double *tradius, box_t tbox );
+bool gpu_check_list( tplist thdlist, vec_t *tdcon, box_t tbox );
+int cpu_make_list( tplist tlist, vec_t *tcon, double *tradius, box_t tbox );
 
 #endif

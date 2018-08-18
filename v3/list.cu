@@ -7,7 +7,7 @@ tpblocks hdblock;
 __device__ bool device_nb_ornot( double xi, double yi, double ri, double xj, double yj, double rj, double lx);
 
 // calc parameters of hyperconfig
-void calc_nblocks( tpblocks *thdblock, tpbox tbox )
+void calc_nblocks( tpblocks *thdblock, box_t tbox )
     {
     // numbers of blocks in xy dimension
     int nblockx = ceil( sqrt( (double)tbox.natom / mean_of_block ) );
@@ -27,7 +27,7 @@ void calc_nblocks( tpblocks *thdblock, tpbox tbox )
     thdblock->args.dl.y     = dly;
     }
 
-void recalc_nblocks( tpblocks *thdblock, tpbox tbox )
+void recalc_nblocks( tpblocks *thdblock, box_t tbox )
     {
     // numbers of blocks in xy dimension
     int nblockx = thdblock->args.nblock.x;
@@ -91,7 +91,7 @@ __global__ void kernel_make_hypercon( tponeblock *tdoneblocks,
     }
 
 // host subroutine used for making hypercon
-cudaError_t gpu_make_hypercon( tpblocks thdblock, vec_t *thdcon, double *thdradius, tpbox tbox )
+cudaError_t gpu_make_hypercon( tpblocks thdblock, vec_t *thdcon, double *thdradius, box_t tbox )
     {
     const int block_size = 256;
     const int nblocks    = thdblock.args.nblocks;
@@ -201,7 +201,7 @@ __global__ void kernel_make_list( tponelist *tonelist, tponeblock *toneblocks, d
 cudaError_t gpu_make_list( tplist   thdlist,
                            tpblocks thdblock,
                            vec_t    *tdcon,
-                           tpbox    tbox )
+                           box_t    tbox )
     {
     const int block_size = 256;
     const int natom = tbox.natom;
@@ -295,7 +295,7 @@ __global__ void kernel_make_list_fallback( tponelist *tonelist, vec_t *tdcon, do
     }
 
 // host subroutine used for makelist
-cudaError_t gpu_make_list_fallback( tplist thdlist, vec_t *thdcon, double *thdradius, tpbox tbox )
+cudaError_t gpu_make_list_fallback( tplist thdlist, vec_t *thdcon, double *thdradius, box_t tbox )
     {
     const int block_size = const_256;
     const double lx = tbox.len.x;
@@ -355,7 +355,7 @@ __global__ void kernel_check_list(  tponelist *tonelist,
     }
 
 // host subroutine used for checking list
-bool gpu_check_list( tplist thdlist, vec_t *tdcon, tpbox tbox )
+bool gpu_check_list( tplist thdlist, vec_t *tdcon, box_t tbox )
     {
     need_remake = 0;
 
@@ -380,7 +380,7 @@ bool gpu_check_list( tplist thdlist, vec_t *tdcon, tpbox tbox )
     return flag;
     }
 
-int cpu_make_list( tplist tlist, vec_t *tcon, double *tradius, tpbox tbox )
+int cpu_make_list( tplist tlist, vec_t *tcon, double *tradius, box_t tbox )
     {
     const int natom = tbox.natom;
     const double lx = tbox.len.x;

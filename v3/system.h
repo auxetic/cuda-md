@@ -39,7 +39,7 @@ typedef struct
     vec_t   len;
     vec_t   leninv;
     double  strain;
-    } tpbox;
+    } box_t;
 
 typedef struct
     {
@@ -48,7 +48,7 @@ typedef struct
     } tpsets;
 
 // variables define
-static tpbox  box;
+static box_t  box;
 static tpsets sets;
 
 #endif

@@ -25,7 +25,7 @@ cudaError_t device_alloc_con( vec_t **tcon, double **tradius, int tnatom )
     }
 
 // generate random config on host
-void gen_config( vec_t *tcon, double *tradius, tpbox *tbox, tpsets tsets )
+void gen_config( vec_t *tcon, double *tradius, box_t *tbox, tpsets tsets )
     {
     // 1. intiate random number generator;
     srand(tsets.seed);
@@ -65,7 +65,7 @@ void gen_config( vec_t *tcon, double *tradius, tpbox *tbox, tpsets tsets )
     }
 
 // read config
-void read_config( FILE *tfio, vec_t *tcon, double *tradius, tpbox *tbox )
+void read_config( FILE *tfio, vec_t *tcon, double *tradius, box_t *tbox )
     {
     int natom;
     fscanf(tfio, "%d", &natom);
@@ -91,7 +91,7 @@ void read_config( FILE *tfio, vec_t *tcon, double *tradius, tpbox *tbox )
     }
 
 // move all atoms to central box
-void trim_config( vec_t *tcon, tpbox tbox )
+void trim_config( vec_t *tcon, box_t tbox )
     {
     double lx = tbox.len.x;
     double ly = tbox.len.y;
@@ -124,7 +124,7 @@ __global__ void kernel_trim_config( vec_t *tcon, int tnatom, double lx, double l
         }
     }
 
-cudaError_t gpu_trim_config( vec_t *tcon, tpbox tbox )
+cudaError_t gpu_trim_config( vec_t *tcon, box_t tbox )
     {
     const int    natom = tbox.natom;
     const double lx    = tbox.len.x;
