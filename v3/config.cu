@@ -99,14 +99,14 @@ void trim_config( vec_t *tcon, box_t tbox )
         {
         double cory;
         cory = round( tcon[i].y / ly );
-        tcon[i].x -= cory * ly * tbox.strain;
+        tcon[i].x -= ly * cory * tbox.strain;
 
-        tcon[i].x -= round( tcon[i].x / lx ) * lx;
-        tcon[i].y -= cory * ly;
+        tcon[i].x -= lx * round( tcon[i].x / lx );
+        tcon[i].y -= ly * cory;
         }
     }
 
-__global__ void kernel_trim_config( vec_t *tcon, int tnatom, double lx, double ly )
+__global__ void kernel_trim_config( vec_t *tcon, int tnatom, double lx, double ly, double strain )
     {
     const int i   = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -116,8 +116,11 @@ __global__ void kernel_trim_config( vec_t *tcon, int tnatom, double lx, double l
         x = tcon[i].x;
         y = tcon[i].y;
 
-        x -= round( x/lx ) * lx;
-        y -= round( y/ly ) * ly;
+        short cory = (short)round(y/ly);
+        x -= ly * strain * cory;
+
+        x -= lx * round( x/lx );
+        y -= ly * cory;
 
         tcon[i].x = x;
         tcon[i].y = y;
@@ -126,15 +129,16 @@ __global__ void kernel_trim_config( vec_t *tcon, int tnatom, double lx, double l
 
 cudaError_t gpu_trim_config( vec_t *tcon, box_t tbox )
     {
-    const int    natom = tbox.natom;
-    const double lx    = tbox.len.x;
-    const double ly    = tbox.len.y;
+    const int    natom  = tbox.natom;
+    const double lx     = tbox.len.x;
+    const double ly     = tbox.len.y;
+    const double strain = tbox.strain;
 
     const int    block_size = 256;
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
 
-    kernel_trim_config<<< grids, threads >>>( tcon, natom, lx, ly );
+    kernel_trim_config<<< grids, threads >>>( tcon, natom, lx, ly, strain );
     check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;

@@ -151,7 +151,7 @@ __global__ void kernel_make_list( onelist_t *tonelist, oneblock_t *toneblocks, d
         {
         for ( int biy=-1; biy<=1; biy++ )
             {
-            __shared__ intd wrap;
+            __shared__ intv wrap;
             if ( tid == 0 )
                 {
                 // get neighbor block

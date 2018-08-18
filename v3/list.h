@@ -31,7 +31,7 @@ typedef struct
 typedef struct
     {
     int    nblocks;
-    intd   nblock;
+    intv   nblock;
     vec_t  dl;
     } blockargs_t;
 
