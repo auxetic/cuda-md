@@ -36,22 +36,22 @@ void mini_fire_cv( vec_t *tcon, double *tradius, box_t tbox )
     memcpy( hdradius, tradius, firebox.natom*sizeof(double) );
 
     // init list
-    tplist hdlist;
+    list_t hdlist;
     hdlist.natom = firebox.natom;
-    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) );
+    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(onelist_t) );
     // hypercon
-    tpblocks hdblock;
+    blocks_t hdblock;
     calc_nblocks( &hdblock, firebox );
-    cudaMallocManaged( &(hdblock.oneblocks), hdblock.args.nblocks*sizeof(tponeblock) );
+    cudaMallocManaged( &(hdblock.oneblocks), hdblock.args.nblocks*sizeof(oneblock_t) );
     // make list
     printf( "making hypercon \n" );
     gpu_make_hypercon( hdblock, hdcon, hdradius, firebox );
     printf( "making list \n" );
     gpu_make_list( hdlist, hdblock, hdcon, firebox );
     // test
-    //tplist hlist;
+    //list_t hlist;
     //hlist.natom = firebox.natom;
-    //cudaMallocManaged( &(hlist.onelists), hlist.natom*sizeof(tponelist) );
+    //cudaMallocManaged( &(hlist.onelists), hlist.natom*sizeof(onelist_t) );
     ////cpu_make_list( hlist, hdcon, tradius, firebox );
     //gpu_make_list_fallback( hlist, hdcon, hdradius, firebox );
 
@@ -159,13 +159,13 @@ void mini_fire_cp( vec_t *tcon, double *tradius, box_t *tbox0, double target_pre
     memcpy( hdradius, tradius, firebox.natom*sizeof(double) );
 
     // init list
-    tplist hdlist; //hlist;
+    list_t hdlist; //hlist;
     hdlist.natom = firebox.natom;
-    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) );
+    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(onelist_t) );
     // hypercon
-    tpblocks hdblock;
+    blocks_t hdblock;
     calc_nblocks( &hdblock, firebox );
-    cudaMallocManaged( &(hdblock.oneblocks), hdblock.args.nblocks*sizeof(tponeblock) );
+    cudaMallocManaged( &(hdblock.oneblocks), hdblock.args.nblocks*sizeof(oneblock_t) );
     // make list
     printf( "making hypercon \n" );
     gpu_make_hypercon( hdblock, hdcon, hdradius, firebox );

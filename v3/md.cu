@@ -10,8 +10,8 @@ cudaError_t gpu_modify_force( vec_t *thdconf, vec_t *thdconv, box_t tbox, double
 #define dt 0.01
 vec_t  *hdcon, *hdconv, *hdconf;
 double *hdradius;
-tpblocks hdmdblock;
-tplist   hdlist;
+blocks_t hdmdblock;
+list_t   hdlist;
 
 // kernel varialbes
 #define BLOCK_SIZE_256  256
@@ -33,9 +33,9 @@ void init_nvt( vec_t *thcon, double *thradius, box_t tbox, double ttemper )
 
     // list
     hdlist.natom = tbox.natom;
-    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) );
+    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(onelist_t) );
     calc_nblocks( &hdmdblock, tbox );
-    cudaMallocManaged( &(hdmdblock.oneblocks), hdmdblock.args.nblocks*sizeof(tponeblock) );
+    cudaMallocManaged( &(hdmdblock.oneblocks), hdmdblock.args.nblocks*sizeof(oneblock_t) );
     // make list
     printf( "making hypercon \n" );
     gpu_make_hypercon( hdmdblock, hdcon, hdradius, tbox );

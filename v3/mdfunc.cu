@@ -102,7 +102,7 @@ cudaError_t gpu_update_v( vec_t *thdconv, vec_t *thdconf, box_t tbox, double dt)
     }
 
 
-__global__ void kernel_calc_force( vec_t *thdconf, tponelist *tonelist, vec_t *thdcon, double *thdradius, int tnatom, double tlx )
+__global__ void kernel_calc_force( vec_t *thdconf, onelist_t *tonelist, vec_t *thdcon, double *thdradius, int tnatom, double tlx )
     {
     __shared__ double sm_wili;
 
@@ -166,7 +166,7 @@ __global__ void kernel_calc_force( vec_t *thdconf, tponelist *tonelist, vec_t *t
 
     }
 
-cudaError_t gpu_calc_force( vec_t *thdconf, tplist thdlist, vec_t *thdcon, double *thdradius, double *static_press, box_t tbox )
+cudaError_t gpu_calc_force( vec_t *thdconf, list_t thdlist, vec_t *thdcon, double *thdradius, double *static_press, box_t tbox )
     {
     const int block_size = 256;
 
