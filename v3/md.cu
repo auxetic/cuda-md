@@ -17,7 +17,7 @@ list_t   hdlist;
 #define BLOCK_SIZE_256  256
 __managed__ double mpp, mpf;
 
-tpmdset mdset;
+mdset_t mdset;
 
 
 void init_nvt( vec_t *thcon, double *thradius, box_t tbox, double ttemper )

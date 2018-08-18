@@ -22,7 +22,7 @@ extern double *dradius;
 
 // subroutines
 void alloc_con( vec_t **tcon, double **tradius, int tnatom );
-void gen_config( vec_t *tcon, double *tradius, box_t *tbox, tpsets tsets );
+void gen_config( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets );
 void read_config( FILE *tfio, vec_t *tcon, double *tradius, box_t *tbox );
 void trim_config( vec_t *tcon, box_t tbox );
 

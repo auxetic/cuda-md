@@ -45,10 +45,10 @@ typedef struct
     {
     int     seed;
     double  phi;
-    } tpsets;
+    } sets_t;
 
 // variables define
 static box_t  box;
-static tpsets sets;
+static sets_t sets;
 
 #endif

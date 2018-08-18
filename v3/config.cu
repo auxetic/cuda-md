@@ -25,7 +25,7 @@ cudaError_t device_alloc_con( vec_t **tcon, double **tradius, int tnatom )
     }
 
 // generate random config on host
-void gen_config( vec_t *tcon, double *tradius, box_t *tbox, tpsets tsets )
+void gen_config( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets )
     {
     // 1. intiate random number generator;
     srand(tsets.seed);
