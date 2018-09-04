@@ -20,11 +20,20 @@ void calc_nblocks( blocks_t *thdblock, box_t tbox )
     double dlx = tbox.len.x / nblockx;
     double dly = tbox.len.y / nblockx;
 
-    thdblock->args.nblocks  = nblocks;
-    thdblock->args.nblock.x = nblockx;
-    thdblock->args.nblock.y = nblocky;
-    thdblock->args.dl.x     = dlx;
-    thdblock->args.dl.y     = dly;
+    // shear offset
+    double strain = tbox.strain;
+    strain -= round(strain);
+    double boffset_x = tbox.len.y * strain;
+    int boffset_xn = (int)round(boffset_x / dlx);
+
+    thdblock->args.nblocks    = nblocks;
+    thdblock->args.nblock.x   = nblockx;
+    thdblock->args.nblock.y   = nblocky;
+    thdblock->args.dl.x       = dlx;
+    thdblock->args.dl.y       = dly;
+    thdblock->args.strain     = strain;
+    thdblock->args.boffset_x  = boffset_x;
+    thdblock->args.boffset_xn = boffset_xn;
     }
 
 void recalc_nblocks( blocks_t *thdblock, box_t tbox )
@@ -35,11 +44,11 @@ void recalc_nblocks( blocks_t *thdblock, box_t tbox )
     //int nblocky = nblockx;
 
     // length of block
-    double dlx = tbox.len.x / nblockx;
-    double dly = tbox.len.y / nblocky;
+    thdblock->args.dl.x = tbox.len.x / nblockx;
+    thdblock->args.dl.y = tbox.len.y / nblocky;
 
-    thdblock->args.dl.x = dlx;
-    thdblock->args.dl.y = dly;
+    // shear offset
+    thdblock->args.boffset_x = tbox.len.y * thdblock->args.strain;
     }
 
 // set block.natom to zero
@@ -54,6 +63,7 @@ __global__ void kernel_init_hypercon( oneblock_t *tdoneblocks, int tnblocks )
 __global__ void kernel_make_hypercon( oneblock_t *tdoneblocks,
                                       int    tnblockx,
                                       double tdlx,
+                                      double strain,
                                       vec_t  *tdcon,
                                       double *tdradius,
                                       double tlx,
@@ -64,12 +74,19 @@ __global__ void kernel_make_hypercon( oneblock_t *tdoneblocks,
     if ( i >= tnatom )
         return;
 
+    // get location
     vec_t  rai = tdcon[i];
     double ri  = tdradius[i];
 
+    // for shear
+    short cory = (short)round(rai.y / tlx);
+    rai.x -= cory * strain * tly;
+
+    // put back atom out of box
     rai.x -= round( rai.x / tlx ) * tlx;
     rai.y -= round( rai.y / tlx ) * tlx;
 
+    // calculate block id
     int bidx, bidy, bid;
     bidx = (int)floor( (rai.x+0.5*tlx) / tdlx );
     bidy = (int)floor( (rai.y+0.5*tlx) / tdlx );
@@ -99,6 +116,7 @@ cudaError_t gpu_make_hypercon( blocks_t thdblock, vec_t *thdcon, double *thdradi
     const int natom      = tbox.natom;
     const double lx  = tbox.len.x;
     const double dlx = thdblock.args.dl.x;
+    const double strain = tbox.strain - round(tbox.strain);
 
     // set hypercon.natom to zero
     dim3 grid1( (nblocks/block_size)+1, 1, 1 );
@@ -112,6 +130,7 @@ cudaError_t gpu_make_hypercon( blocks_t thdblock, vec_t *thdcon, double *thdradi
     kernel_make_hypercon <<< grids, threads >>>(thdblock.oneblocks,
                                                 nblockx,
                                                 dlx,
+                                                strain,
                                                 thdcon,
                                                 thdradius,
                                                 lx,
@@ -169,7 +188,7 @@ __global__ void kernel_make_list( onelist_t *tonelist, oneblock_t *toneblocks, d
 
             if ( tid < nb_block.natom )
                 {
-                nb_block.rx[tid] += wrap.x * tlx;
+                nb_block.rx[tid] += wrap.x * tlx - wrap.y * boffset_x;
                 nb_block.ry[tid] += wrap.y * tlx;
                 }
             __syncthreads();
