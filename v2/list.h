@@ -26,45 +26,45 @@ typedef struct
     double ry[maxn_of_block];
     double radius[maxn_of_block];
     int    tag[maxn_of_block];
-    } tponeblock;
+    } oneblock_t;
 
 typedef struct
     {
     int    nblocks;
     intd   nblock;
-    tpvec  dl;
-    } tpblockargs;
+    vec_t  dl;
+    } blockargs_t;
 
 typedef struct
     {
-    tpblockargs args;
-    tponeblock  *oneblocks;
-    } tpblocks;
+    blockargs_t args;
+    oneblock_t  *oneblocks;
+    } blocks_t;
 
 typedef struct
     {
     int    nbsum;
     int    nb[listmax];
     double x, y;
-    } tponelist;
+    } onelist_t;
 
 typedef struct
     {
     int natom;
-    tponelist *onelists;
-    } tplist;
+    onelist_t *onelists;
+    } list_t;
 
 // variables define
-extern tpblocks hdblocks;
-extern tplist  *dlist;
+extern blocks_t hdblocks;
+extern list_t  *dlist;
 
 // subroutines
-void calc_nblocks( tpblocks *thdblocks, tpbox tbox );
-void recalc_nblocks( tpblocks *thdblocks, tpbox tbox );
-cudaError_t gpu_make_hypercon( tpblocks thdblocks, tpvec *tdcon, double *tdradius, tpbox tbox );
-cudaError_t gpu_make_list( tplist thdlist, tpblocks thdblocks, tpvec *tdcon, tpbox tbox );
-cudaError_t gpu_make_list_fallback( tplist thdlist, tpvec *tdcon, double *tradius, tpbox tbox );
-bool gpu_check_list( tplist thdlist, tpvec *tdcon, tpbox tbox );
-int cpu_make_list( tplist tlist, tpvec *tcon, double *tradius, tpbox tbox );
+void calc_nblocks( blocks_t *thdblocks, box_t tbox );
+void recalc_nblocks( blocks_t *thdblocks, box_t tbox );
+cudaError_t gpu_make_hypercon( blocks_t thdblocks, vec_t *tdcon, double *tdradius, box_t tbox );
+cudaError_t gpu_make_list( list_t thdlist, blocks_t thdblocks, vec_t *tdcon, box_t tbox );
+cudaError_t gpu_make_list_fallback( list_t thdlist, vec_t *tdcon, double *tradius, box_t tbox );
+bool gpu_check_list( list_t thdlist, vec_t *tdcon, box_t tbox );
+int cpu_make_list( list_t tlist, vec_t *tcon, double *tradius, box_t tbox );
 
 #endif

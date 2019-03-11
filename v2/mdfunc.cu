@@ -8,7 +8,7 @@ __managed__ double g_fmax;
 __managed__ double g_wili;
 
 
-__global__ void kernel_zero_confv( tpvec *thdconfv, int tnatom )
+__global__ void kernel_zero_confv( vec_t *thdconfv, int tnatom )
     {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
     if ( i < tnatom )
@@ -18,7 +18,7 @@ __global__ void kernel_zero_confv( tpvec *thdconfv, int tnatom )
         }
     }
 
-cudaError_t gpu_zero_confv( tpvec *thdconfv, tpbox tbox )
+cudaError_t gpu_zero_confv( vec_t *thdconfv, box_t tbox )
     {
     const int block_size = 256;
     const int natom = tbox.natom;
@@ -34,13 +34,13 @@ cudaError_t gpu_zero_confv( tpvec *thdconfv, tpbox tbox )
     }
 
 
-__global__ void kernel_update_vr( tpvec *thdcon, tpvec *thdconv, tpvec *thdconf, int tnatom, double dt )
+__global__ void kernel_update_vr( vec_t *thdcon, vec_t *thdconv, vec_t *thdconf, int tnatom, double dt )
     {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     if ( i < tnatom )
         {
-        tpvec ra, va, fa;
+        vec_t ra, va, fa;
 
         ra = thdcon[i];
         va = thdconv[i];
@@ -56,7 +56,7 @@ __global__ void kernel_update_vr( tpvec *thdcon, tpvec *thdconv, tpvec *thdconf,
         }
     }
 
-cudaError_t gpu_update_vr( tpvec *thdcon, tpvec *thdconv, tpvec *thdconf, tpbox tbox, double dt)
+cudaError_t gpu_update_vr( vec_t *thdcon, vec_t *thdconv, vec_t *thdconf, box_t tbox, double dt)
     {
     const int block_size = 256;
 
@@ -71,13 +71,13 @@ cudaError_t gpu_update_vr( tpvec *thdcon, tpvec *thdconv, tpvec *thdconf, tpbox 
     }
 
 
-__global__ void kernel_update_v( tpvec *thdconv, tpvec *thdconf, int tnatom, double hfdt )
+__global__ void kernel_update_v( vec_t *thdconv, vec_t *thdconf, int tnatom, double hfdt )
     {
     const int i = threadIdx.x + blockIdx.x * blockDim.x;
 
     if ( i < tnatom )
         {
-        tpvec va, fa;
+        vec_t va, fa;
         va    = thdconv[i];
         fa    = thdconf[i];
         va.x += fa.x * hfdt;
@@ -86,7 +86,7 @@ __global__ void kernel_update_v( tpvec *thdconv, tpvec *thdconf, int tnatom, dou
         }
     }
 
-cudaError_t gpu_update_v( tpvec *thdconv, tpvec *thdconf, tpbox tbox, double dt)
+cudaError_t gpu_update_v( vec_t *thdconv, vec_t *thdconf, box_t tbox, double dt)
     {
     const int block_size = BLOCK_SIZE_256;
 
@@ -102,7 +102,7 @@ cudaError_t gpu_update_v( tpvec *thdconv, tpvec *thdconf, tpbox tbox, double dt)
     }
 
 
-__global__ void kernel_calc_force( tpvec *thdconf, tponelist *tonelist, tpvec *thdcon, double *thdradius, int tnatom, double tlx )
+__global__ void kernel_calc_force( vec_t *thdconf, onelist_t *tonelist, vec_t *thdcon, double *thdradius, int tnatom, double tlx )
     {
     __shared__ double sm_wili;
 
@@ -118,8 +118,8 @@ __global__ void kernel_calc_force( tpvec *thdconf, tponelist *tonelist, tpvec *t
 
     int nbsum = tonelist[i].nbsum;
 
-    tpvec  rai = thdcon[i];
-    tpvec  fai = { 0.0, 0.0 };
+    vec_t  rai = thdcon[i];
+    vec_t  fai = { 0.0, 0.0 };
     double ri  = thdradius[i];
     double wi  = 0.0;
 
@@ -127,7 +127,7 @@ __global__ void kernel_calc_force( tpvec *thdconf, tponelist *tonelist, tpvec *t
         {
         int j = tonelist[i].nb[jj];
 
-        tpvec raj = thdcon[j];
+        vec_t raj = thdcon[j];
         // dij equal to raidius of atom j
         double rj = thdradius[j];
 
@@ -166,7 +166,7 @@ __global__ void kernel_calc_force( tpvec *thdconf, tponelist *tonelist, tpvec *t
 
     }
 
-cudaError_t gpu_calc_force( tpvec *thdconf, tplist thdlist, tpvec *thdcon, double *thdradius, double *static_press, tpbox tbox )
+cudaError_t gpu_calc_force( vec_t *thdconf, list_t thdlist, vec_t *thdcon, double *thdradius, double *static_press, box_t tbox )
     {
     const int block_size = 256;
 
@@ -187,7 +187,7 @@ cudaError_t gpu_calc_force( tpvec *thdconf, tplist thdlist, tpvec *thdcon, doubl
     }
 
 
-__global__ void kernel_calc_fmax( tpvec *thdconf, int tnatom )
+__global__ void kernel_calc_fmax( vec_t *thdconf, int tnatom )
     {
     __shared__ double block_f[BLOCK_SIZE_256];
     const int tid = threadIdx.x;
@@ -216,7 +216,7 @@ __global__ void kernel_calc_fmax( tpvec *thdconf, int tnatom )
         atomicMax( &g_fmax, block_f[0] );
     }
 
-double gpu_calc_fmax( tpvec *thdconf, tpbox tbox )
+double gpu_calc_fmax( vec_t *thdconf, box_t tbox )
     {
     const int block_size = BLOCK_SIZE_256;
     const int natom = tbox.natom;

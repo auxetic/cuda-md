@@ -19,13 +19,13 @@ typedef struct
     {
     double temper;
     double press;
-    } tpmdset;
+    } mdset_t;
 
 // variable define
-extern tpmdset mdset;
+extern mdset_t mdset;
 
-void init_nvt( tpvec *thcon, double *thradius, tpbox tbox, double ttemper );
-void gpu_run_nvt( tpvec *tdcon, tpvec *tdconv, tpvec *tdconf, double ttemper, int steps );
+void init_nvt( vec_t *thcon, double *thradius, box_t tbox, double ttemper );
+void gpu_run_nvt( vec_t *tdcon, vec_t *tdconv, vec_t *tdconf, double ttemper, int steps );
 
 
 #endif

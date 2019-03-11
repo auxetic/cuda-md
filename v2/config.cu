@@ -2,30 +2,30 @@
 
 // variables define
 // host
-tpvec  *con;
+vec_t  *con;
 double *radius;
 // device
-tpvec  *dcon;
+vec_t  *dcon;
 double *dradius;
 
 
 // allocate memory space of config
-void alloc_con( tpvec **tcon, double **tradius, int tnatom )
+void alloc_con( vec_t **tcon, double **tradius, int tnatom )
     {
-    *tcon    = (tpvec *)malloc( tnatom*sizeof(tpvec)  );
+    *tcon    = (vec_t *)malloc( tnatom*sizeof(vec_t)  );
     *tradius = (double*)malloc( tnatom*sizeof(double) );
     }
 
 // allocate memory space of config
-cudaError_t device_alloc_con( tpvec **tcon, double **tradius, int tnatom )
+cudaError_t device_alloc_con( vec_t **tcon, double **tradius, int tnatom )
     {
-    check_cuda( cudaMallocManaged( &tcon,     tnatom*sizeof(tpvec)  ) );
+    check_cuda( cudaMallocManaged( &tcon,     tnatom*sizeof(vec_t)  ) );
     check_cuda( cudaMallocManaged( &tradius , tnatom*sizeof(double) ) );
     return cudaSuccess;
     }
 
 // generate random config on host
-void gen_config( tpvec *tcon, double *tradius, tpbox *tbox, tpsets tsets )
+void gen_config( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets )
     {
     // 1. intiate random number generator;
     srand(tsets.seed);
@@ -65,7 +65,7 @@ void gen_config( tpvec *tcon, double *tradius, tpbox *tbox, tpsets tsets )
     }
 
 // read config
-void read_config( FILE *tfio, tpvec *tcon, double *tradius, tpbox *tbox )
+void read_config( FILE *tfio, vec_t *tcon, double *tradius, box_t *tbox )
     {
     int natom;
     fscanf(tfio, "%d", &natom);
@@ -91,7 +91,7 @@ void read_config( FILE *tfio, tpvec *tcon, double *tradius, tpbox *tbox )
     }
 
 // move all atoms to central box
-void trim_config( tpvec *tcon, tpbox tbox )
+void trim_config( vec_t *tcon, box_t tbox )
     {
     double lx = tbox.len.x;
     double ly = tbox.len.y;
@@ -106,7 +106,7 @@ void trim_config( tpvec *tcon, tpbox tbox )
         }
     }
 
-__global__ void kernel_trim_config( tpvec *tcon, int tnatom, double lx, double ly )
+__global__ void kernel_trim_config( vec_t *tcon, int tnatom, double lx, double ly )
     {
     const int i   = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -124,7 +124,7 @@ __global__ void kernel_trim_config( tpvec *tcon, int tnatom, double lx, double l
         }
     }
 
-cudaError_t gpu_trim_config( tpvec *tcon, tpbox tbox )
+cudaError_t gpu_trim_config( vec_t *tcon, box_t tbox )
     {
     const int    natom = tbox.natom;
     const double lx    = tbox.len.x;

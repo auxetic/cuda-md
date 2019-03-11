@@ -13,45 +13,45 @@
 //#define fire_const_stepmax 200
 
 // inner subroutines
-cudaError_t gpu_calc_fire_para( tpvec *tdconv, tpvec *tdconf, tpbox tbox );
-cudaError_t gpu_fire_modify_v( tpvec *tdconv, tpvec *tdconf, double tfire_onemb, double tfire_betamvndfn, tpbox tbox);
-cudaError_t gpu_firecp_update_box( tpvec *tdcon, tpbox *firebox, double dt, double current_press, double target_press, double *lv, int tstep );
+cudaError_t gpu_calc_fire_para( vec_t *tdconv, vec_t *tdconf, box_t tbox );
+cudaError_t gpu_fire_modify_v( vec_t *tdconv, vec_t *tdconf, double tfire_onemb, double tfire_betamvndfn, box_t tbox);
+cudaError_t gpu_firecp_update_box( vec_t *tdcon, box_t *firebox, double dt, double current_press, double target_press, double *lv, int tstep );
 
 // variables
 __managed__ double g_fire_vn2, g_fire_fn2, g_fire_power, g_fire_fmax;
 
-void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
+void mini_fire_cv( vec_t *tcon, double *tradius, box_t tbox )
     {
     // allocate arrays used in fire
     // 1. box
-    tpbox firebox = tbox;
+    box_t firebox = tbox;
 
     // 2. config
-    tpvec *hdcon, *hdconv, *hdconf; double *hdradius;
-    cudaMallocManaged( &hdcon,    firebox.natom*sizeof(tpvec)  );
-    cudaMallocManaged( &hdconv,   firebox.natom*sizeof(tpvec)  );
-    cudaMallocManaged( &hdconf,   firebox.natom*sizeof(tpvec)  );
+    vec_t *hdcon, *hdconv, *hdconf; double *hdradius;
+    cudaMallocManaged( &hdcon,    firebox.natom*sizeof(vec_t)  );
+    cudaMallocManaged( &hdconv,   firebox.natom*sizeof(vec_t)  );
+    cudaMallocManaged( &hdconf,   firebox.natom*sizeof(vec_t)  );
     cudaMallocManaged( &hdradius, firebox.natom*sizeof(double) );
-    memcpy( hdcon,    tcon,    firebox.natom*sizeof(tpvec)  );
+    memcpy( hdcon,    tcon,    firebox.natom*sizeof(vec_t)  );
     memcpy( hdradius, tradius, firebox.natom*sizeof(double) );
 
     // init list
-    tplist hdlist;
+    list_t hdlist;
     hdlist.natom = firebox.natom;
-    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) );
+    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(onelist_t) );
     // hypercon
-    tpblocks hdblock;
+    blocks_t hdblock;
     calc_nblocks( &hdblock, firebox );
-    cudaMallocManaged( &(hdblock.oneblocks), hdblock.args.nblocks*sizeof(tponeblock) );
+    cudaMallocManaged( &(hdblock.oneblocks), hdblock.args.nblocks*sizeof(oneblock_t) );
     // make list
     printf( "making hypercon \n" );
     gpu_make_hypercon( hdblock, hdcon, hdradius, firebox );
     printf( "making list \n" );
     gpu_make_list( hdlist, hdblock, hdcon, firebox );
     // test
-    //tplist hlist;
+    //list_t hlist;
     //hlist.natom = firebox.natom;
-    //cudaMallocManaged( &(hlist.onelists), hlist.natom*sizeof(tponelist) );
+    //cudaMallocManaged( &(hlist.onelists), hlist.natom*sizeof(onelist_t) );
     ////cpu_make_list( hlist, hdcon, tradius, firebox );
     //gpu_make_list_fallback( hlist, hdcon, hdradius, firebox );
 
@@ -133,7 +133,7 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
 
         }
 
-    memcpy( tcon, hdcon, firebox.natom*sizeof(tpvec) );
+    memcpy( tcon, hdcon, firebox.natom*sizeof(vec_t) );
 
     cudaFree( hdblock.oneblocks );
     cudaFree( hdlist.onelists );
@@ -143,29 +143,29 @@ void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox )
     cudaFree( hdradius );
     }
 
-void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_press )
+void mini_fire_cp( vec_t *tcon, double *tradius, box_t *tbox0, double target_press )
     {
     // allocate arrays used in fire
     // 1. box
-    tpbox tbox = *tbox0;
-    tpbox firebox = tbox;
+    box_t tbox = *tbox0;
+    box_t firebox = tbox;
     // 2. config
-    tpvec *hdcon, *hdconv, *hdconf; double *hdradius;
-    cudaMallocManaged( &hdcon,    firebox.natom*sizeof(tpvec)  );
-    cudaMallocManaged( &hdconv,   firebox.natom*sizeof(tpvec)  );
-    cudaMallocManaged( &hdconf,   firebox.natom*sizeof(tpvec)  );
+    vec_t *hdcon, *hdconv, *hdconf; double *hdradius;
+    cudaMallocManaged( &hdcon,    firebox.natom*sizeof(vec_t)  );
+    cudaMallocManaged( &hdconv,   firebox.natom*sizeof(vec_t)  );
+    cudaMallocManaged( &hdconf,   firebox.natom*sizeof(vec_t)  );
     cudaMallocManaged( &hdradius, firebox.natom*sizeof(double) );
-    memcpy( hdcon,    tcon,    firebox.natom*sizeof(tpvec)  );
+    memcpy( hdcon,    tcon,    firebox.natom*sizeof(vec_t)  );
     memcpy( hdradius, tradius, firebox.natom*sizeof(double) );
 
     // init list
-    tplist hdlist; //hlist;
+    list_t hdlist; //hlist;
     hdlist.natom = firebox.natom;
-    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(tponelist) );
+    cudaMallocManaged( &(hdlist.onelists), hdlist.natom*sizeof(onelist_t) );
     // hypercon
-    tpblocks hdblock;
+    blocks_t hdblock;
     calc_nblocks( &hdblock, firebox );
-    cudaMallocManaged( &(hdblock.oneblocks), hdblock.args.nblocks*sizeof(tponeblock) );
+    cudaMallocManaged( &(hdblock.oneblocks), hdblock.args.nblocks*sizeof(oneblock_t) );
     // make list
     printf( "making hypercon \n" );
     gpu_make_hypercon( hdblock, hdcon, hdradius, firebox );
@@ -229,7 +229,7 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_pre
         fire_vndfn = sqrt( g_fire_vn2 / g_fire_fn2 );
         fire_betamvndfn = fire_beta * fire_vndfn;
 
-       //cudaMemcpy( hconv, dconv, firebox.natom*sizeof(tpvec), cudaMemcpyDeviceToHost );
+       //cudaMemcpy( hconv, dconv, firebox.natom*sizeof(vec_t), cudaMemcpyDeviceToHost );
         if ( lf * lv <= 0.0 )
             lv = 0.0;
 
@@ -257,7 +257,7 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_pre
 
         }
 
-    memcpy( tcon, hdcon, firebox.natom*sizeof(tpvec) );
+    memcpy( tcon, hdcon, firebox.natom*sizeof(vec_t) );
 
     *tbox0 = firebox;
 
@@ -269,7 +269,7 @@ void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox0, double target_pre
     cudaFree( hdradius );
     }
 
-__global__ void kernel_calc_fire_para( tpvec *thdconv, tpvec *thdconf, int tnatom )
+__global__ void kernel_calc_fire_para( vec_t *thdconv, vec_t *thdconf, int tnatom )
     {
     __shared__ double sm_vn2[SHARE_BLOCK_SIZE];
     __shared__ double sm_fn2[SHARE_BLOCK_SIZE];
@@ -324,7 +324,7 @@ __global__ void kernel_calc_fire_para( tpvec *thdconv, tpvec *thdconf, int tnato
         }
     }
 
-cudaError_t gpu_calc_fire_para( tpvec *thdconv, tpvec *thdconf, tpbox tbox )
+cudaError_t gpu_calc_fire_para( vec_t *thdconv, vec_t *thdconf, box_t tbox )
     {
     const int block_size = 512;
     const int natom = tbox.natom;
@@ -342,7 +342,7 @@ cudaError_t gpu_calc_fire_para( tpvec *thdconv, tpvec *thdconf, tpbox tbox )
     return cudaSuccess;
     }
 
-__global__ void kernel_fire_modify_v( tpvec *thdconv, tpvec *thdconf, int tnatom, double fire_onemb, double fire_betamvndfn )
+__global__ void kernel_fire_modify_v( vec_t *thdconv, vec_t *thdconf, int tnatom, double fire_onemb, double fire_betamvndfn )
     {
     const int i = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -362,7 +362,7 @@ __global__ void kernel_fire_modify_v( tpvec *thdconv, tpvec *thdconf, int tnatom
         }
     }
 
-cudaError_t gpu_fire_modify_v( tpvec *thdconv, tpvec *thdconf, double tfire_onemb, double tfire_betamvndfn, tpbox tbox)
+cudaError_t gpu_fire_modify_v( vec_t *thdconv, vec_t *thdconf, double tfire_onemb, double tfire_betamvndfn, box_t tbox)
     {
     const int block_size = 256;
 
@@ -376,7 +376,7 @@ cudaError_t gpu_fire_modify_v( tpvec *thdconv, tpvec *thdconf, double tfire_onem
     return cudaSuccess;
     }
 
-__global__ void kernel_firecp_update_box( tpvec *thdcon, double tscale, int tnatom )
+__global__ void kernel_firecp_update_box( vec_t *thdcon, double tscale, int tnatom )
     {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -391,7 +391,7 @@ __global__ void kernel_firecp_update_box( tpvec *thdcon, double tscale, int tnat
     thdcon[i].y = ry;
     }
 
-cudaError_t gpu_firecp_update_box( tpvec *thdcon, tpbox *firebox, double dt, double current_press, double target_press, double *lv, int tstep )
+cudaError_t gpu_firecp_update_box( vec_t *thdcon, box_t *firebox, double dt, double current_press, double target_press, double *lv, int tstep )
     {
     const int block_size = 1024;
     const int natom = firebox->natom;

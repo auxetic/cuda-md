@@ -30,25 +30,25 @@ typedef struct
     #if sysdim == 3
         double z;
     #endif
-    } tpvec;
-    
+    } vec_t;
+
 typedef struct
     {
     int     natom;
     double  phi;
-    tpvec   len;
-    tpvec   leninv;
+    vec_t   len;
+    vec_t   leninv;
     double  strain;
-    } tpbox;
+    } box_t;
 
 typedef struct
     {
     int     seed;
     double  phi;
-    } tpsets;
+    } sets_t;
 
 // variables define
-static tpbox  box;
-static tpsets sets;
+static box_t  box;
+static sets_t sets;
 
 #endif

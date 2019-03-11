@@ -17,7 +17,7 @@
 // const
 #define SHARE_BLOCK_SIZE 512
 // subroutine
-void mini_fire_cv( tpvec *tcon, double *tradius, tpbox tbox );
-void mini_fire_cp( tpvec *tcon, double *tradius, tpbox *tbox, double targe_press );
+void mini_fire_cv( vec_t *tcon, double *tradius, box_t tbox );
+void mini_fire_cp( vec_t *tcon, double *tradius, box_t *tbox, double targe_press );
 
 #endif
