@@ -1,110 +1,99 @@
 #include "config.h"
 
 // allocate memory space of config on host
-void alloc_con( vec_t **tcon, double **tradius, int tnatom )
+void alloc_con( vec_t **con, double **radius, int natom )
     {
-    *tcon    = (vec_t *)malloc( tnatom*sizeof(vec_t)  );
-    *tradius = (double*)malloc( tnatom*sizeof(double) );
+    *con    = (vec_t *)malloc( natom*sizeof(vec_t)  );
+    *radius = (double*)malloc( natom*sizeof(double) );
     }
 
 // generate random config on host
-void gen_config( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets )
+void gen_config( vec_t *con, double *radius, box_t *box, sets_t sets )
     {
     // 1. intiate random number generator;
-    srand(tsets.seed);
+    srand(sets.seed);
 
     // 2. set atom radius
-    for ( int i=0; i<tbox->natom; i++ )
+    for ( int i=0; i<box->natom; i++ )
         {
-        if ( i < tbox->natom/2 )
-            tradius[i] = 0.5;
+        if ( i < box->natom/2 )
+            radius[i] = 0.5;
         else
-            tradius[i] = 0.5 * ratio;
+            radius[i] = 0.5 * ratio;
         }
 
     // 3. calc area of disks
     double sdisk = 0.0;
-    for ( int i=0; i<tbox->natom; i++ )
-        {
-        sdisk += tradius[i]*tradius[i]*tradius[i];
-        }
+    for ( int i=0; i<box->natom; i++ )
+        sdisk += radius[i]*radius[i]*radius[i];
     sdisk *= 4.0 / 3.0 * Pi;
 
-
     // 4. cal box.l from phi
-    double vol     = sdisk / tbox->phi;
-    double lx      = cbrt(vol);
-    tbox->len.x    = lx;
-    tbox->len.y    = lx;
-    tbox->len.z    = lx;
-    tbox->leninv.x = 1.0 / lx;
-    tbox->leninv.y = 1.0 / lx;
-    tbox->leninv.z = 1.0 / lx;
-    tbox->strain   = 0.0;
+    double vol = sdisk / box->phi;
+    double lx  = cbrt(vol);
+    box->len.x = lx;
+    box->len.y = lx;
+    box->len.z = lx;
+    box->strain   = 0.0;
 
     // 5. give a random config
-    for ( int i=0; i<tbox->natom; i++ )
+    for ( int i=0; i<box->natom; i++ )
         {
-        tcon[i].x = ( (double)rand()/RAND_MAX - 0.5 ) * lx;
-        tcon[i].y = ( (double)rand()/RAND_MAX - 0.5 ) * lx;
-        tcon[i].z = ( (double)rand()/RAND_MAX - 0.5 ) * lx;
+        con[i].x = ( (double)rand()/RAND_MAX - 0.5 ) * lx;
+        con[i].y = ( (double)rand()/RAND_MAX - 0.5 ) * lx;
+        con[i].z = ( (double)rand()/RAND_MAX - 0.5 ) * lx;
         }
     }
 
 // calc box length using specific volume fraction
-void calc_boxl(double *tradius, box_t *tbox)
+void calc_boxl(double *radius, box_t *box)
     {
-    int natom  = tbox->natom;
-    double phi = tbox->phi;
+    int natom  = box->natom;
+    double phi = box->phi;
 
     double sdisk = 0.0;
     for ( int i=0; i<natom; i++ )
-        sdisk += tradius[i]*tradius[i]*tradius[i];
+        sdisk += radius[i]*radius[i]*radius[i];
     sdisk *= Pi * 4.0 / 3.0;
 
-    double vol     = sdisk / phi;
-    double lx      = cbrt(vol);
-    tbox->len.x    = lx;
-    tbox->len.y    = lx;
-    tbox->len.z    = lx;
-    tbox->leninv.x = 1.0 / lx;
-    tbox->leninv.y = 1.0 / lx;
-    tbox->leninv.z = 1.0 / lx;
-    tbox->strain   = 0.0;
+    double vol = sdisk / phi;
+    double lx  = cbrt(vol);
+    box->len.x  = lx;
+    box->len.y  = lx;
+    box->len.z  = lx;
+    box->strain = 0.0;
     }
+
 // generate fcc lattice on host // have some issue // wait for debug
-void gen_lattice_fcc ( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets )
+void gen_lattice_fcc ( vec_t *con, double *radius, box_t *box, sets_t sets )
     {
-    int natom  = tbox->natom;
-    double phi = tbox->phi;
+    int natom  = box->natom;
+    double phi = box->phi;
 
     // 1. set atom radius
     for ( int i=0; i<natom; i++ )
-            tradius[i] = 0.5;
+        radius[i] = 0.5;
 
     // 2. calc area of disks
     double sdisk = 0.0;
     for ( int i=0; i<natom; i++ )
-        sdisk += tradius[i]*tradius[i]*tradius[i];
+        sdisk += radius[i]*radius[i]*radius[i];
     sdisk *= Pi * 4.0 / 3.0;
 
     // 3. cal box.l from phi
-    double vol     = sdisk / phi;
-    double lx      = cbrt(vol);
-    tbox->len.x    = lx;
-    tbox->len.y    = lx;
-    tbox->len.z    = lx;
-    tbox->leninv.x = 1.0 / lx;
-    tbox->leninv.y = 1.0 / lx;
-    tbox->leninv.z = 1.0 / lx;
-    tbox->strain   = 0.0;
+    double vol = sdisk / phi;
+    double lx  = cbrt(vol);
+    box->len.x  = lx;
+    box->len.y  = lx;
+    box->len.z  = lx;
+    box->strain = 0.0;
 
     // 4. primitive cell
     int nxyz = (int)cbrt((double)(natom/4));
     if ( 4*(int)pow(nxyz,3) != natom )
         printf("wrong number of atoms\n");
     printf("natom is %d, nxyz is %d\n", natom, nxyz);
-    double cl;cl = lx / (double)nxyz;
+    double cl = lx / (double)nxyz;
     printf("primitive cell length is %le\n", cl);
     printf("vol is %le\n", vol);
     printf("phi is %le\n", phi);
@@ -116,155 +105,152 @@ void gen_lattice_fcc ( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets )
             for ( int kk=0; kk<nxyz; kk++ )
                 {
                 i += 1;
-                tcon[i].x = (ii-1) * cl;
-                tcon[i].y = (jj-1) * cl;
-                tcon[i].z = (kk-1) * cl;
+                con[i].x = (ii-1) * cl;
+                con[i].y = (jj-1) * cl;
+                con[i].z = (kk-1) * cl;
                 i += 1;
-                tcon[i].x = (ii-1+0.5) * cl;
-                tcon[i].y = (jj-1+0.5) * cl;
-                tcon[i].z = (kk-1    ) * cl;
+                con[i].x = (ii-1+0.5) * cl;
+                con[i].y = (jj-1+0.5) * cl;
+                con[i].z = (kk-1    ) * cl;
                 i += 1;
-                tcon[i].x = (ii-1+0.5) * cl;
-                tcon[i].y = (jj-1    ) * cl;
-                tcon[i].z = (kk-1+0.5) * cl;
+                con[i].x = (ii-1+0.5) * cl;
+                con[i].y = (jj-1    ) * cl;
+                con[i].z = (kk-1+0.5) * cl;
                 i += 1;
-                tcon[i].x = (ii-1    ) * cl;
-                tcon[i].y = (jj-1+0.5) * cl;
-                tcon[i].z = (kk-1+0.5) * cl;
+                con[i].x = (ii-1    ) * cl;
+                con[i].y = (jj-1+0.5) * cl;
+                con[i].z = (kk-1+0.5) * cl;
                 }
 
     // 6. add an offset
     double offset = 0.5;
     for ( int i = 0; i < natom; i++ )
         {
-        tcon[i].x += offset;
-        tcon[i].y += offset;
-        tcon[i].z += offset;
+        con[i].x += offset;
+        con[i].y += offset;
+        con[i].z += offset;
         }
 
     // 7. trim configuration
-    //trim_config( tcon, *tbox );
+    //trim_config( con, *box );
     }
 
 // read config
-void read_config( FILE *tfio, vec_t *tcon, double *tradius, box_t *tbox )
+void read_config( FILE *fio, vec_t *con, double *radius, box_t *box )
     {
     double dnatom;
-    fscanf(tfio, "%le", &dnatom);
-    tbox->natom = (int) dnatom;
+    fscanf(fio, "%le", &dnatom);
+    box->natom = (int) dnatom;
     double phi;
-    fscanf(tfio, "%le", &phi);
-    tbox->phi = phi;
+    fscanf(fio, "%le", &phi);
+    box->phi = phi;
     double tmp;
-    fscanf(tfio, "%le", &tmp);
-    fscanf(tfio, "%le", &tmp);
+    fscanf(fio, "%le", &tmp);
+    fscanf(fio, "%le", &tmp);
     double lx,ly,lz;
-    fscanf(tfio, "%le", &lx);
-    fscanf(tfio, "%le", &ly);
-    fscanf(tfio, "%le", &lz);
-    tbox->len.x = lx;
-    tbox->len.y = ly;
-    tbox->len.z = lz;
-    tbox->leninv.x = 1e0/lx;
-    tbox->leninv.y = 1e0/ly;
-    tbox->leninv.z = 1e0/lz;
+    fscanf(fio, "%le", &lx);
+    fscanf(fio, "%le", &ly);
+    fscanf(fio, "%le", &lz);
+    box->len.x = lx;
+    box->len.y = ly;
+    box->len.z = lz;
     double strain;
-    fscanf(tfio, "%le", &strain);
-    tbox->strain = strain;
+    fscanf(fio, "%le", &strain);
+    box->strain = strain;
 
-    for ( int i=0; i<tbox->natom; i++ )
+    for ( int i=0; i<box->natom; i++ )
         {
         double x, y, z, r;
-        fscanf(tfio, "%le", &x);
-        fscanf(tfio, "%le", &y);
-        fscanf(tfio, "%le", &z);
-        fscanf(tfio, "%le", &r);
+        fscanf(fio, "%le", &x);
+        fscanf(fio, "%le", &y);
+        fscanf(fio, "%le", &z);
+        fscanf(fio, "%le", &r);
 
-        tcon[i].x  = x;
-        tcon[i].y  = y;
-        tcon[i].z  = z;
-        tradius[i] = r;
+        con[i].x  = x;
+        con[i].y  = y;
+        con[i].z  = z;
+        radius[i] = r;
         }
     }
 
 // write config
-void write_config( FILE *tfio, vec_t *tcon, double *tradius, box_t *tbox )
+void write_config( FILE *fio, vec_t *con, double *radius, box_t *box )
     {
-    int natom      = tbox->natom;
-    double phi     = tbox->phi;
-    double lx      = tbox->len.x;
-    double ly      = tbox->len.y;
-    double lz      = tbox->len.z;
-    double strain  = tbox->strain;
+    int natom      = box->natom;
+    double phi     = box->phi;
+    double lx      = box->len.x;
+    double ly      = box->len.y;
+    double lz      = box->len.z;
+    double strain  = box->strain;
 
-        //fprintf( fio, "%d %26.16e \n", box.natom, box.len.x );
-    fprintf( tfio, "%26.16e  %26.16e  %26.16e  %26.16e\n", (double)natom, phi, 0.0, 0.0 );
-    fprintf( tfio, "%26.16e  %26.16e  %26.16e  %26.16e\n", lx, ly, lz, strain);
+    //fprintf( fio, "%d %26.16e \n", box.natom, box.len.x );
+    fprintf( fio, "%26.16e  %26.16e  %26.16e  %26.16e\n", (double)natom, phi, 0.0, 0.0 );
+    fprintf( fio, "%26.16e  %26.16e  %26.16e  %26.16e\n", lx, ly, lz, strain);
     for ( int i = 0; i < natom; i++ )
-        fprintf( tfio, "%26.16e  %26.16e  %26.16e  %26.16e \n", tcon[i].x, tcon[i].y, tcon[i].z, tradius[i] );
+        fprintf( fio, "%26.16e  %26.16e  %26.16e  %26.16e \n", con[i].x, con[i].y, con[i].z, radius[i] );
 
     }
 
 // move all atoms to central box
-void trim_config( vec_t *tcon, box_t tbox )
+void trim_config( vec_t *con, box_t box )
     {
-    double lx = tbox.len.x;
-    double ly = tbox.len.y;
-    double lz = tbox.len.z;
-    for ( int i=0; i<tbox.natom; i++ )
+    double lx = box.len.x;
+    double ly = box.len.y;
+    double lz = box.len.z;
+    for ( int i=0; i<box.natom; i++ )
         {
         double cory;
-        cory = round( tcon[i].y / ly );
-        tcon[i].x -= cory * ly * tbox.strain;
+        cory = round( con[i].y / ly );
+        con[i].x -= cory * ly * box.strain;
 
-        tcon[i].x -= round( tcon[i].x / lx ) * lx;
-        tcon[i].y -= cory * ly;
-        tcon[i].z -= round( tcon[i].z / lz ) * lz;
+        con[i].x -= round( con[i].x / lx ) * lx;
+        con[i].y -= cory * ly;
+        con[i].z -= round( con[i].z / lz ) * lz;
         }
     }
 
 
 // subroutines for hyperconfiguration
 // calc parameters of hyperconfig
-void calc_hypercon_args( hycon_t *thdhycon, box_t tbox )
+void calc_hypercon_args( hycon_t *hycon, box_t box )
     {
     // numbers of blocks in xyz dimension
-    int nblockx = ceil( cbrt ( (double)tbox.natom / mean_size_of_block ) );
+    int nblockx = ceil( cbrt ( (double)box.natom / mean_size_of_block ) );
 
     // sum number of blocks
     int nblocks = nblockx * nblockx * nblockx;
 
     // length of block
-    double dlx = tbox.len.x / nblockx;
-    double dly = tbox.len.y / nblockx;
-    double dlz = tbox.len.z / nblockx;
+    double dlx = box.len.x / nblockx;
+    double dly = box.len.y / nblockx;
+    double dlz = box.len.z / nblockx;
 
     if ( dlx < ratio ) printf("#WARNING TOO SMALL HYPERCON BLOCK SIZE FOR FORCE CUTOFF\n");
 
-    thdhycon->args.nblocks  = nblocks;
-    thdhycon->args.nblock.x = nblockx;
-    thdhycon->args.nblock.y = nblockx;
-    thdhycon->args.nblock.z = nblockx;
-    thdhycon->args.dl.x     = dlx;
-    thdhycon->args.dl.y     = dly;
-    thdhycon->args.dl.z     = dlz;
+    hycon->args.nblocks = nblocks;
+    hycon->args.nblock.x  = nblocx;
+    hycon->args.nblock.y  = nblocx;
+    hycon->args.nblock.z  = nblocx;
+    hycon->args.dl.x      = dlx;
+    hycon->args.dl.y      = dly;
+    hycon->args.dl.z      = dlz;
     }
 
-void recalc_hypercon_args( hycon_t *thdblock, box_t tbox )
+void recalc_hypercon_args( hycon_t *hycon, box_t box )
     {
     // numbers of blocks in xy dimension
-    int nblockx = thdblock->args.nblock.x;
-    int nblocky = thdblock->args.nblock.y;
-    int nblockz = thdblock->args.nblock.z;
+    int nblockx = hycon->args.nblock.x;
+    int nblocky = hycon->args.nblock.y;
+    int nblockz = hycon->args.nblock.z;
 
     // length of block
-    double dlx = tbox.len.x / nblockx;
-    double dly = tbox.len.y / nblocky;
-    double dlz = tbox.len.z / nblockz;
+    double dlx = box.len.x / nblockx;
+    double dly = box.len.y / nblocky;
+    double dlz = box.len.z / nblockz;
 
-    thdblock->args.dl.x = dlx;
-    thdblock->args.dl.y = dly;
-    thdblock->args.dl.z = dlz;
+    hycon->args.dl.x = dlx;
+    hycon->args.dl.y = dly;
+    hycon->args.dl.z = dlz;
     }
 
 // calculate minimum image index of block with given x, y, z
@@ -276,9 +262,9 @@ __inline__ int indexb( int ix, int iy, int iz, int m)
     }
 
 // calculate every block's surrunding 26 block # once and before making hypercon
-void map( hycon_t thdblocks )
+void map( hycon_t hycon )
     {
-    int nblockx   = thdblocks.args.nblock.x;
+    int nblockx   = hycon.args.nblock.x;
     int bid, *neighb;
     for (int ix = 0; ix < nblockx; ix++)
         {
@@ -287,7 +273,7 @@ void map( hycon_t thdblocks )
             for (int iz = 0; iz < nblockx; iz++)
                 {
                     bid        = indexb(ix, iy, iz, nblockx);
-                    neighb     = thdblocks.oneblocks[bid].neighb;
+                    neighb     = hycon.blocks[bid].neighb;
 
                     neighb[0]  = indexb(ix + 1, iy,     iz, nblockx); 
                     neighb[1]  = indexb(ix + 1, iy + 1, iz, nblockx);
@@ -325,57 +311,54 @@ void map( hycon_t thdblocks )
 
 
 // allocate memory space of config on device
-cudaError_t alloc_managed_con( vec_t *tcon, double *tradius, int tnatom )
+cudaError_t alloc_managed_con( vec_t *con, double *radius, int natom )
     {
-    check_cuda( cudaMallocManaged( &tcon,     tnatom*sizeof(vec_t)  ) );
-    check_cuda( cudaMallocManaged( &tradius , tnatom*sizeof(double) ) );
+    check_cuda( cudaMallocManaged( &con,     natom*sizeof(vec_t)  ) );
+    check_cuda( cudaMallocManaged( &radius , natom*sizeof(double) ) );
     return cudaSuccess;
     }
 
 // allocate memory space of hyperconfig as managed 
-cudaError_t alloc_managed_hypercon( hycon_t *thdhycon )
+cudaError_t alloc_managed_hypercon( hycon_t *hycon )
     {
-    int nblocks = thdhycon->args.nblocks;
-    check_cuda( cudaMallocManaged( &thdhycon->oneblocks, nblocks*sizeof(cell_t) ) );
+    int nblocks = hycon->args.nblocks;
+    check_cuda( cudaMallocManaged( &hycon->blocks, nblocks*sizeof(block_t) ) );
     return cudaSuccess;
     }
 
-__global__ void kernel_trim_config( vec_t *tcon, int tnatom, double lx, double ly, double lz)
+__global__ void kernel_trim_config( vec_t *con, int natom, double lx, double ly, double lz)
     {
     const int i   = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if ( i < tnatom )
+    if ( i < natom )
         {
         double x, y, z;
-        x = tcon[i].x;
-        y = tcon[i].y;
+        x = con[i].x;
+        y = con[i].y;
+        z = con[i].z;
 
         x -= round( x/lx ) * lx;
         y -= round( y/ly ) * ly;
-
-        tcon[i].x = x;
-        tcon[i].y = y;
-
-#if sysdim == 3
-        z = tcon[i].z;
         z -= round( z/lz ) * lz;
-        tcon[i].z = z;
-#endif
+
+        con[i].x = x;
+        con[i].y = y;
+        con[i].z = z;
         }
     }
 
-cudaError_t gpu_trim_config( vec_t *tcon, box_t tbox )
+cudaError_t gpu_trim_config( vec_t *con, box_t box )
     {
-    const int    natom = tbox.natom;
-    const double lx    = tbox.len.x;
-    const double ly    = tbox.len.y;
-    const double lz    = tbox.len.z;
+    const int    natom = box.natom;
+    const double lx    = box.len.x;
+    const double ly    = box.len.y;
+    const double lz    = box.len.z;
 
     const int    block_size = 256;
     dim3 grids( (natom/block_size)+1, 1, 1 );
     dim3 threads( block_size, 1, 1 );
 
-    kernel_trim_config<<< grids, threads >>>( tcon, natom, lx, ly, lz );
+    kernel_trim_config<<< grids, threads >>>( con, natom, lx, ly, lz );
     check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
@@ -384,13 +367,13 @@ cudaError_t gpu_trim_config( vec_t *tcon, box_t tbox )
 // subroutines for hyperconfiguration
 
 // calculate minimum image index of block with given rx, ry, rz
-__inline__ __device__ int indexb( double rx, double ry, double rz, double tlx, int m)
+__inline__ __device__ int indexb( double rx, double ry, double rz, double lx, int m)
     {
     double blocki = (double) m;
     
-    rx /= tlx;
-    ry /= tlx;
-    rz /= tlx;
+    rx /= lx;
+    ry /= lx;
+    rz /= lx;
     rx -= round(rx);
     ry -= round(ry);
     rz -= round(rz);
@@ -401,7 +384,7 @@ __inline__ __device__ int indexb( double rx, double ry, double rz, double tlx, i
     }
 
 
-__global__ void kernel_reset_hypercon_block(cell_t *block)
+__global__ void kernel_reset_hypercon_block(block_t *block)
     {
     const int i = threadIdx.x;
 
@@ -413,75 +396,75 @@ __global__ void kernel_reset_hypercon_block(cell_t *block)
     }
 
 // calculte index of each atom and register it into block structure // map config into hyperconfig
-__global__ void kernel_make_hypercon( cell_t *tdoneblocks,
-                                      vec_t      *tdcon,
-                                      double     *tdradius,
-                                      double      tlx,
-                                      int         tnblockx,
-                                      int         tnatom )
+__global__ void kernel_make_hypercon( block_t *blocks,
+                                      vec_t   *con,
+                                      double  *radius,
+                                      double  lx,
+                                      int     nblockx,
+                                      int     natom )
     {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if ( i >= tnatom ) return;
+    if ( i >= natom ) return;
 
-    double rx = tdcon[i].x;
-    double ry = tdcon[i].y;
-    double rz = tdcon[i].z;
-    double ri = tdradius[i];
+    double rx = con[i].x;
+    double ry = con[i].y;
+    double rz = con[i].z;
+    double ri = radius[i];
 
     double x = rx;
     double y = ry;
     double z = rz;
 
-    rx /= tlx;
-    ry /= tlx;
-    rz /= tlx;
+    rx /= lx;
+    ry /= lx;
+    rz /= lx;
     rx -= round(rx);
     ry -= round(ry);
     rz -= round(rz);
 
     int bid;
-    bid =  (int) floor((rx + 0.5) * (double)tnblockx )                          
-          +(int) floor((ry + 0.5) * (double)tnblockx ) * tnblockx             
-          +(int) floor((rz + 0.5) * (double)tnblockx ) * tnblockx * tnblockx;
+    bid =  (int) floor((rx + 0.5) * (double)nblockx )                          
+          +(int) floor((ry + 0.5) * (double)nblockx ) * nblockx             
+          +(int) floor((rz + 0.5) * (double)nblockx ) * nblockx * nblockx;
 
-    int idxinblock = atomicAdd( &tdoneblocks[bid].natom, 1);
+    int idxinblock = atomicAdd( &blocks[bid].natom, 1);
     if ( idxinblock < max_size_of_block - 2 )
         {
-        tdoneblocks[bid].rx[idxinblock]     = x;
-        tdoneblocks[bid].ry[idxinblock]     = y;
-        tdoneblocks[bid].rz[idxinblock]     = z;
-        tdoneblocks[bid].radius[idxinblock] = ri;
-        tdoneblocks[bid].tag[idxinblock]    = i;
+        blocks[bid].rx[idxinblock]     = x;
+        blocks[bid].ry[idxinblock]     = y;
+        blocks[bid].rz[idxinblock]     = z;
+        blocks[bid].radius[idxinblock] = ri;
+        blocks[bid].tag[idxinblock]    = i;
         }
     else
         {
         // TODO one should consider those exced the max number of atoms per blocks
-        atomicSub( &tdoneblocks[bid].natom, 1 );
-        //idxinblock = atomicAdd( &tdoneblocks[bid]->extrablock.natom, 1);
-        //tdoneblocks[bid]->extrablock.rx[idxinblock]     = x;
-        //tdoneblocks[bid]->extrablock.ry[idxinblock]     = y;
-        //tdoneblocks[bid]->extrablock.rz[idxinblock]     = z;
-        //tdoneblocks[bid]->extrablock.radius[idxinblock] = ri;
-        //tdoneblocks[bid]->extrablock.tag[idxinblock]    = i;
+        atomicSub( &blocks[bid].natom, 1 );
+        //idxinblock = atomicAdd( &blocks[bid]->extra.natom, 1);
+        //blocks[bid]->extra.rx[idxinblock]     = x;
+        //blocks[bid]->extra.ry[idxinblock]     = y;
+        //blocks[bid]->extra.rz[idxinblock]     = z;
+        //blocks[bid]->extra.radius[idxinblock] = ri;
+        //blocks[bid]->extra.tag[idxinblock]    = i;
         }
     }
 
-cudaError_t gpu_make_hypercon( hycon_t thdblock, vec_t *thdcon, double *thdradius, box_t tbox)
+cudaError_t gpu_make_hypercon( hycon_t hycon, vec_t *con, double *radius, box_t box)
     {
     const int block_size = 256;
-    const int nblocks    = thdblock.args.nblocks;
-    const int nblockx    = thdblock.args.nblock.x;
-    const int natom      = tbox.natom;
-    const double lx      = tbox.len.x;
+    const int nblocks    = hycon.args.nblocks;
+    const int nblockx    = hycon.args.nblock.x;
+    const int natom      = box.natom;
+    const double lx      = box.len.x;
 
     int grids, threads;
 
     //reset hypercon
-    cell_t *block;
+    block_t *block;
     for ( int i = 0; i < nblocks; i++ )
         {
-        block = &thdblock.oneblocks[i];
+        block = &hycon.blocks[i];
 
         block->natom = 0;
         threads = max_size_of_block;
@@ -490,15 +473,15 @@ cudaError_t gpu_make_hypercon( hycon_t thdblock, vec_t *thdcon, double *thdradiu
     check_cuda( cudaDeviceSynchronize() );
 
     // recalculate hypercon block length
-    //recalc_hypercon_args(thdblock, tbox );
+    //recalc_hypercon_args(hycon, box );
 
     // main
     grids   = (natom/block_size)+1;
     threads = block_size;
 
-    kernel_make_hypercon <<< grids, threads >>>(thdblock.oneblocks,
-                                                thdcon,
-                                                thdradius,
+    kernel_make_hypercon <<< grids, threads >>>(hycon.blocks,
+                                                con,
+                                                radius,
                                                 lx,
                                                 nblockx,
                                                 natom );
@@ -508,36 +491,36 @@ cudaError_t gpu_make_hypercon( hycon_t thdblock, vec_t *thdcon, double *thdradiu
     }
 
 
-__global__ void kernel_map_hypercon_con (cell_t *tblock, vec_t *tdcon, double *tdradius)
+__global__ void kernel_map_hypercon_con (block_t *block, vec_t *con, double *radius)
     {
     const int tid = threadIdx.x;
 
-    const int i   = tblock->tag[tid];
+    const int i   = block->tag[tid];
 
-    if ( tid >= tblock->natom) return;
+    if ( tid >= block->natom) return;
 
-    tdcon[i].x = tblock->rx[tid];
-    tdcon[i].y = tblock->ry[tid];
-    tdcon[i].z = tblock->rz[tid];
-    tdradius[i] = tblock->radius[tid];
-
+    con[i].x  = block->rx[tid];
+    con[i].y  = block->ry[tid];
+    con[i].z  = block->rz[tid];
+    radius[i] = block->radius[tid];
     }
-cudaError_t gpu_map_hypercon_con( hycon_t *thdblock, vec_t *thdcon, double *thdradius, box_t tbox)
+
+cudaError_t gpu_map_hypercon_con( hycon_t *hycon, vec_t *con, double *radius, box_t box)
     {
-    const int nblocks    = thdblock->args.nblocks;
-    //const int nblockx    = thdblock->args.nblock.x;
-    //const int natom      = tbox.natom;
-    //const double lx      = tbox.len.x;
+    const int nblocks    = hycon->args.nblocks;
+    //const int nblockx    = hycon->args.nblock.x;
+    //const int natom      = box.natom;
+    //const double lx      = box.len.x;
 
     //map hypercon into normal con with index of atom unchanged
     int grids, threads;
-    cell_t *block;
+    block_t *block;
     for ( int i = 0; i < nblocks; i++ )
         {
-        block = &thdblock->oneblocks[i];
+        block = &hycon->blocks[i];
         grids = 1;
         threads = max_size_of_block;
-        kernel_map_hypercon_con<<<grids, threads>>>(block, thdcon, thdradius);
+        kernel_map_hypercon_con<<<grids, threads>>>(block, con, radius);
         }
     check_cuda( cudaDeviceSynchronize() );
 
