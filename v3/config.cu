@@ -24,6 +24,14 @@ cudaError_t device_alloc_con( vec_t **tcon, double **tradius, int tnatom )
     return cudaSuccess;
     }
 
+// allocate memory space of hyperconfig as managed 
+cudaError_t alloc_hypercon( hycon_t *thdhycon )
+    {
+    int nblocks = thdhycon->args.nblocks;
+    check_cuda( cudaMallocManaged( &thdhycon.oneblocks, nblocks*sizeof(cell_t) ) );
+    return cudaSuccess;
+    }
+
 // generate random config on host
 void gen_config( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets )
     {
