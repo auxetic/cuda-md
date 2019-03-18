@@ -11,22 +11,24 @@
 int main(void)
     {
     box_t  box;
-    box.natom = 1024;
+    box.natom = 128;
     box.phi   = 0.88;
     sets_t sets;
     sets.seed = 1;
     cudaSetDevice(0);
 
-    vec_t   *con;
-    double  *radius;
-    hycon_t *hycon;
+    double  *radius = NULL;
+    vec_t   *con    = NULL;
+    check_cuda( cudaMallocManaged( &con,     box.natom*sizeof(vec_t)  ) );
+    check_cuda( cudaMallocManaged( &radius , box.natom*sizeof(double) ) );
+    gen_config( con, radius, &box, sets );
 
-    alloc_managed_con( con, radius, box.natom );
-    gen_config( con, radius, box, sets );
-
-    calc_hypercon_args( hycon, box );
-    alloc_managed_hypercon( hycon );
+    hycon_t hycon;
+    calc_hypercon_args( &hycon, box );
+    check_cuda( cudaMallocManaged( &hycon.oneblocks, hycon.args.nblocks*sizeof(cell_t) ) );
+    printf("h\n");//debug
     gpu_make_hypercon( hycon, con, radius, box);
+    map( hycon );
 
     return 0;
     }

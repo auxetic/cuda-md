@@ -13,8 +13,8 @@
 #include "common.h"
 
 // max size of a block
-#define max_size_of_block 128
-#define mean_size_of_block 64
+#define max_size_of_block 20
+#define mean_size_of_block 12
 
 // block type to make up hyperconfiguration
 typedef struct
@@ -46,7 +46,7 @@ typedef struct
     } hycon_t;
 
 // subroutines for configuration 
-void gen_config( vec_t *tcon, double *tradius, box_t tbox, sets_t tsets );
+void gen_config( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets );
 void alloc_con( vec_t **tcon, double **tradius, int tnatom );
 void gen_lattice_fcc ( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets );
 void read_config( FILE *tfio, vec_t *tcon, double *tradius, box_t *tbox );
@@ -62,10 +62,11 @@ void recalc_nblocks( hycon_t *thdblocks, box_t tbox );
 
 // subroutines for hyperconfiguration
 void map( hycon_t thdblocks );
+//void map( hycon_t *thdblocks );
 void calc_hypercon_args( hycon_t *thdhycon, box_t tbox );
 void recalc_hypercon_args( hycon_t *thdblock, box_t tbox );
 cudaError_t alloc_managed_hypercon( hycon_t *thdhycon );
 cudaError_t gpu_map_hypercon_con( hycon_t *thdblock, vec_t *thdcon, double *thdradius, box_t tbox);
-cudaError_t gpu_make_hypercon( hycon_t *thdblock, vec_t *thdcon, double *thdradius, box_t tbox);
+cudaError_t gpu_make_hypercon( hycon_t thdblock, vec_t *thdcon, double *thdradius, box_t tbox);
 
 #endif
