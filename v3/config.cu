@@ -31,10 +31,10 @@ void gen_config( vec_t *con, double *radius, box_t *box, sets_t sets )
     // 4. cal box.l from phi
     double vol = sdisk / box->phi;
     double lx  = cbrt(vol);
-    box->len.x = lx;
-    box->len.y = lx;
-    box->len.z = lx;
-    box->strain   = 0.0;
+    box->len.x  = lx;
+    box->len.y  = lx;
+    box->len.z  = lx;
+    box->strain = 0.0;
 
     // 5. give a random config
     for ( int i=0; i<box->natom; i++ )
@@ -176,12 +176,12 @@ void read_config( FILE *fio, vec_t *con, double *radius, box_t *box )
 // write config
 void write_config( FILE *fio, vec_t *con, double *radius, box_t *box )
     {
-    int natom      = box->natom;
-    double phi     = box->phi;
-    double lx      = box->len.x;
-    double ly      = box->len.y;
-    double lz      = box->len.z;
-    double strain  = box->strain;
+    int natom     = box->natom;
+    double phi    = box->phi;
+    double lx     = box->len.x;
+    double ly     = box->len.y;
+    double lz     = box->len.z;
+    double strain = box->strain;
 
     //fprintf( fio, "%d %26.16e \n", box.natom, box.len.x );
     fprintf( fio, "%26.16e  %26.16e  %26.16e  %26.16e\n", (double)natom, phi, 0.0, 0.0 );
@@ -227,13 +227,13 @@ void calc_hypercon_args( hycon_t *hycon, box_t box )
 
     if ( dlx < ratio ) printf("#WARNING TOO SMALL HYPERCON BLOCK SIZE FOR FORCE CUTOFF\n");
 
-    hycon->args.nblocks = nblocks;
-    hycon->args.nblock.x  = nblocx;
-    hycon->args.nblock.y  = nblocx;
-    hycon->args.nblock.z  = nblocx;
-    hycon->args.dl.x      = dlx;
-    hycon->args.dl.y      = dly;
-    hycon->args.dl.z      = dlz;
+    hycon->args.nblocks  = nblocks;
+    hycon->args.nblock.x = nblocx;
+    hycon->args.nblock.y = nblocx;
+    hycon->args.nblock.z = nblocx;
+    hycon->args.dl.x     = dlx;
+    hycon->args.dl.y     = dly;
+    hycon->args.dl.z     = dlz;
     }
 
 void recalc_hypercon_args( hycon_t *hycon, box_t box )
@@ -495,7 +495,7 @@ __global__ void kernel_map_hypercon_con (block_t *block, vec_t *con, double *rad
     {
     const int tid = threadIdx.x;
 
-    const int i   = block->tag[tid];
+    const int i = block->tag[tid];
 
     if ( tid >= block->natom) return;
 
@@ -508,9 +508,9 @@ __global__ void kernel_map_hypercon_con (block_t *block, vec_t *con, double *rad
 cudaError_t gpu_map_hypercon_con( hycon_t *hycon, vec_t *con, double *radius, box_t box)
     {
     const int nblocks    = hycon->args.nblocks;
-    //const int nblockx    = hycon->args.nblock.x;
-    //const int natom      = box.natom;
-    //const double lx      = box.len.x;
+    // const int nblockx = hycon->args.nblock.x;
+    // const int natom   = box.natom;
+    // const double lx   = box.len.x;
 
     //map hypercon into normal con with index of atom unchanged
     int grids, threads;
