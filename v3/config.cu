@@ -2,21 +2,21 @@
 
 // variables define
 // host
-tpvec  *con;
+vec_t  *con;
 double *radius;
 // device
-tpvec  *dcon;
+vec_t  *dcon;
 double *dradius;
 
 
-// allocate memory space of config
+// allocate memory space of config on host
 void alloc_con( tpvec **tcon, double **tradius, int tnatom )
     {
     *tcon    = (tpvec *)malloc( tnatom*sizeof(tpvec)  );
     *tradius = (double*)malloc( tnatom*sizeof(double) );
     }
 
-// allocate memory space of config
+// allocate memory space of config on device
 cudaError_t device_alloc_con( tpvec **tcon, double **tradius, int tnatom )
     {
     check_cuda( cudaMallocManaged( &tcon,     tnatom*sizeof(tpvec)  ) );
@@ -108,7 +108,6 @@ void calc_boxl(double *tradius, tpbox *tbox)
     tbox->leninv.y = 1.0 / lx;
     tbox->leninv.z = 1.0 / lx;
     tbox->strain   = 0.0;
-
     }
 // generate fcc lattice on host
 // have some issue
@@ -316,17 +315,19 @@ __inline__ int indexb( int ix, int iy, int iz, int m)
            ((iz - 1 + m ) % m ) * m * m;
     }
 
-// calculate every block's surrunding 26 block #
+// calculate every block's surrunding 26 block # once and before making hypercon
 void map( tpblocks thdblocks )
     {
-    int nblock   = thdblocks.args.nblocks;
-    int imap, *neighb;
-    for (int ix = 0; ix < nblock; ix++)
-        for (int iy = 0; iy < nblock; iy++)
-            for (int iz = 0; iz < nblock; iz++)
+    int nblockx   = thdblocks.args.nblockx;
+    int bid, *neighb;
+    for (int ix = 0; ix < nblockx; ix++)
+        {
+        for (int iy = 0; iy < nblockx; iy++)
+            {
+            for (int iz = 0; iz < nblockx; iz++)
                 {
-                    imap       = indexb(ix, iy, iz);
-                    neighb     = thdblocks.oneblocks[imap].neighb;
+                    bid        = indexb(ix, iy, iz, nblockx);
+                    neighb     = thdblocks.oneblocks[bid].neighb;
 
                     neighb[0]  = indexb(ix + 1, iy,     iz   ); 
                     neighb[1]  = indexb(ix + 1, iy + 1, iz   );
@@ -357,6 +358,8 @@ void map( tpblocks thdblocks )
                     neighb[24] = indexb(ix + 1, iy - 1, iz + 1);
                     neighb[25] = indexb(ix    , iy    , iz + 1);
                 }
+            }
+        }
     }
 
 // calculate minimum image index of block with given rx, ry, rz
@@ -377,23 +380,37 @@ __inline__ __device__ int indexb( double rx, double ry, double rz, double tlx, i
     }
 
 
-// calculte index of each atom and register it into block structure
+__global__ void kernel_reset_hypercon_block(tponeblock *block)
+    {
+    const int i = threadIdx.x;
+
+    block->rx[i]     = 0.0;
+    block->ry[i]     = 0.0;
+    block->rz[i]     = 0.0;
+    block->radius[i] = 0.0;
+    block->tag[i]    = -1;
+    }
+
+// calculte index of each atom and register it into block structure // map config into hyperconfig
 __global__ void kernel_make_hypercon( tponeblock *tdoneblocks,
                                       tpvec      *tdcon,
                                       double     *tdradius,
-                                      double     tlx,
-                                      int        tnblockx,
-                                      int        tnatom )
+                                      double      tlx,
+                                      int         tnblockx,
+                                      int         tnatom )
     {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if ( i >= tnatom )
-        return;
+    if ( i >= tnatom ) return;
 
     double rx = tdcon[i].x;
     double ry = tdcon[i].y;
     double rz = tdcon[i].z;
     double ri = tdradius[i];
+
+    double x = rx;
+    double y = ry;
+    double z = rz;
 
     rx /= tlx;
     ry /= tlx;
@@ -403,47 +420,61 @@ __global__ void kernel_make_hypercon( tponeblock *tdoneblocks,
     rz -= round(rz);
 
     int bid;
-    bid = (int)floor((rx + 0.5) * (double)tnblockx )                          
-          (int)floor((ry + 0.5) * (double)tnblockx ) * tnblockx             
-          (int)floor((rz + 0.5) * (double)tnblockx ) * tnblockx * tnblockx;
+    bid = (int) floor((rx + 0.5) * (double)tnblockx )                          
+          (int) floor((ry + 0.5) * (double)tnblockx ) * tnblockx             
+          (int) floor((rz + 0.5) * (double)tnblockx ) * tnblockx * tnblockx;
 
     int idxinblock = atomicAdd( &tdoneblocks[bid].natom, 1);
     if ( idxinblock < max_size_of_block - 2 )
         {
-        tdoneblocks[bid].rx[idxinblock]     = rx * tlx;
-        tdoneblocks[bid].ry[idxinblock]     = ry * tlx;
-        tdoneblocks[bid].rz[idxinblock]     = rz * tlx;
+        tdoneblocks[bid].rx[idxinblock]     = x;
+        tdoneblocks[bid].ry[idxinblock]     = y;
+        tdoneblocks[bid].rz[idxinblock]     = z;
         tdoneblocks[bid].radius[idxinblock] = ri;
         tdoneblocks[bid].tag[idxinblock]    = i;
         }
     else
         {
+        // TODO one should consider those exced the max number of atoms per blocks
         atomicSub( &tdoneblocks[bid].natom, 1 );
+        idxinblock = atomicAdd( &tdoneblocks[bid]->extrablock.natom, 1);
+        tdoneblocks[bid]->extrablock.rx[idxinblock]     = x;
+        tdoneblocks[bid]->extrablock.ry[idxinblock]     = y;
+        tdoneblocks[bid]->extrablock.rz[idxinblock]     = z;
+        tdoneblocks[bid]->extrablock.radius[idxinblock] = ri;
+        tdoneblocks[bid]->extrablock.tag[idxinblock]    = i;
         }
-    // TODO one should consider those exced the max number of atoms per blocks
     }
 
-cudaError_t gpu_make_hypercon( tpblocks thdblock, tpvec *thdcon, double *thdradius, tpbox tbox)
+cudaError_t gpu_make_hypercon( tpblocks *thdblock, tpvec *thdcon, double *thdradius, tpbox tbox)
     {
     const int block_size = 256;
-    const int nblocks    = thdblock.args.nblocks;
-    const int nblockx    = thdblock.args.nblock.x;
+    const int nblocks    = thdblock->args.nblocks;
+    const int nblockx    = thdblock->args.nblock.x;
     const int natom      = tbox.natom;
     const double lx      = tbox.len.x;
 
-    //set all natom per oneblock to 0
+    int grids, threads;
+
+    //reset hypercon
+    tponeblock *block;
     for ( int i = 0; i < nblocks; i++ )
         {
-        thdblock.oneblocks[i].natom = 0;
+        block = &thdblock->oneblocks[i];
+
+        block->natom = 0;
+        threads = max_size_of_block;
+        kernel_reset_hypercon_block <<<1, threads>>> (block);
         }
+    check_cuda( cudaDeviceSynchronize() );
 
     // recalculate hypercon block length
-    recalc_nblocks( &thdblock, tbox );
+    recalc_nblocks( thdblock, tbox );
 
     // main
-    dim3 grid2( (natom/block_size)+1, 1, 1 );
-    dim3 thread2( block_size, 1, 1 );
-    kernel_make_hypercon <<< grids, threads >>>(thdblock.oneblocks,
+    grids   = (natom/block_size)+1;
+    threads = block_size;
+    kernel_make_hypercon <<< grids, threads >>>(thdblock->oneblocks,
                                                 nblockx,
                                                 thdcon,
                                                 thdradius,
@@ -455,3 +486,36 @@ cudaError_t gpu_make_hypercon( tpblocks thdblock, tpvec *thdcon, double *thdradi
     }
 
 
+__global__ void kernel_map_hypercon_con (tponeblock *tblock, vec_t *tdcon, vec_t *tdradius)
+    {
+    const int tid = threadIdx.x;
+
+    const int i   = tblock->tag[tid];
+
+    if ( tid >= tblock->natom) return;
+
+    tdcon[i].x = tblock->rx[tid];
+    tdcon[i].y = tblock->ry[tid];
+    tdcon[i].z = tblock->rz[tid];
+    tdradius[i].x = tblock->radius[tid];
+
+    }
+cudaError_t gpu_map_hypercon_con( tpblocks *thdblock, tpvec *thdcon, double *thdradius, tpbox tbox)
+    {
+    const int nblocks    = thdblock->args.nblocks;
+    const int nblockx    = thdblock->args.nblock.x;
+    const int natom      = tbox.natom;
+    const double lx      = tbox.len.x;
+
+    //map hypercon into normal con with index of atom unchanged
+    int grids, threads;
+    for ( int i = 0; i < nblocks; i++ )
+        {
+        block = &thdblock->oneblocks[i];
+        threads = max_size_of_block;
+        kernel_map_hypercon_con<<<1, threads>>>(block, thdcon, thdradius);
+        }
+    check_cuda( cudaDeviceSynchronize() );
+
+    return cudaSuccess;
+    }

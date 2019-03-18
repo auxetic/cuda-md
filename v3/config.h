@@ -24,16 +24,17 @@ extern double *radius;
 extern vec_t  *dcon;
 extern double *dradius;
 
-// block type
+// block type to make up hyperconfiguration
 typedef struct
     {
     int    natom;
     int    neighb[26];
+
+    int    tag[max_size_of_block];
     double rx[max_size_of_block];
     double ry[max_size_of_block];
     double rz[max_size_of_block];
     double radius[max_size_of_block];
-    int    tag[max_size_of_block];
 
     tponeblock *extrablock;
     } tponeblock;
@@ -41,24 +42,13 @@ typedef struct
 typedef struct
     {
     int    nblocks;
-    intd   nblock;
-    tpvec  blocklen;
+    intv_t nblock;
+    vec_t  blocklen;
     } tpblockargs;
 
 typedef struct
     {
-    int    natom;
-    double rx[maxn_of_extra_block];
-    double ry[maxn_of_extra_block];
-    double rz[maxn_of_extra_block];
-    double radius[maxn_of_extra_block];
-    int    tag[maxn_of_extra_block];
-    int    tagb[maxn_of_extra_block];
-    } tpextrablock;
-
-typedef struct
-    {
-    tpblockargs args;
+    tpblockargs    args;
     tponeblock    *oneblocks;
     } tpblocks;
 
@@ -74,18 +64,10 @@ void calc_boxl(double *tradius, tpbox *tbox);
 cudaError_t device_alloc_con( tpvec **tcon, double **tradius, int tnatom );
 cudaError_t gpu_trim_config( tpvec *tcon, tpbox tbox );
 
-// subroutines for block 
-// set up map of block structure for use in calculating force // cpu 
-void map( tpblocks thdblocks );
-// find every block structure member // only gpu
-cudaError_t gpu_make_hypercon();
-// give the index of the block acording to the x,y,z integer  // cpu 
-__inline__ int indexb( int ix, int iy, int iz, int m);
-// what is the number of block this atom is
-__devine__ __inline__ tpvec iblock(tpvec loc);
-// calculate number of blocks of hypercon
 void calc_nblocks( tpblocks *thdblocks, tpbox tbox );
-// recaculate number of blocks of hypercon
 void recalc_nblocks( tpblocks *thdblocks, tpbox tbox );
+
+// subroutines for hyperconfiguration
+cudaError_t gpu_make_hypercon();
 
 #endif

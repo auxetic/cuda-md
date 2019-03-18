@@ -23,7 +23,7 @@ typedef struct
     #if sysdim == 3
         int z;
     #endif
-    } intv;
+    } intv_t;
 
 typedef struct
     {
