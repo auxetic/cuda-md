@@ -12,34 +12,30 @@
 #include "system.h"
 #include "common.h"
 
-// max member of a block
-#define maxn_of_block 128
-#define mean_of_block 64
+// max size of a block
+#define max_size_of_block 128
+#define mean_size_of_block 64
 
-#define mean_of_extra_block 1<<20
-
-
-
-// variables define
+// global variables define
 // host
-extern tpvec  *con;
+extern vec_t  *con;
 extern double *radius;
 // device
-extern tpvec  *dcon;
+extern vec_t  *dcon;
 extern double *dradius;
 
 // block type
 typedef struct
     {
     int    natom;
-    double rx[maxn_of_block];
-    double ry[maxn_of_block];
-    double rz[maxn_of_block];
-    double radius[maxn_of_block];
-    int    tag[maxn_of_block];
-
-// index of neighbour for this block
     int    neighb[26];
+    double rx[max_size_of_block];
+    double ry[max_size_of_block];
+    double rz[max_size_of_block];
+    double radius[max_size_of_block];
+    int    tag[max_size_of_block];
+
+    tponeblock *extrablock;
     } tponeblock;
 
 typedef struct
@@ -64,7 +60,6 @@ typedef struct
     {
     tpblockargs args;
     tponeblock    *oneblocks;
-    tpextrablock  extrablock;
     } tpblocks;
 
 // subroutines for configuration 

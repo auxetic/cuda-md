@@ -3,7 +3,9 @@
 
 #define ratio   1.4
 #define Pi      3.1415926535897932
-#define sysdim  2
+#define pi      3.1415926535897932
+#define PI      3.1415926535897932
+#define sysdim  3
 
 #define const_32   32
 #define const_64   64

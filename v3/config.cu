@@ -408,7 +408,7 @@ __global__ void kernel_make_hypercon( tponeblock *tdoneblocks,
           (int)floor((rz + 0.5) * (double)tnblockx ) * tnblockx * tnblockx;
 
     int idxinblock = atomicAdd( &tdoneblocks[bid].natom, 1);
-    if ( idxinblock < maxn_of_block - 2 )
+    if ( idxinblock < max_size_of_block - 2 )
         {
         tdoneblocks[bid].rx[idxinblock]     = rx * tlx;
         tdoneblocks[bid].ry[idxinblock]     = ry * tlx;

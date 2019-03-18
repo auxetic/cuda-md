@@ -122,14 +122,14 @@ __global__ void kernel_calc_force_all_neighb_block(   tpvec      *tdconf,
                                                       const double      tlx )
     {
     __shared__ double sm_wili;
-    __shared__ double rxi[maxn_of_block];
-    __shared__ double ryi[maxn_of_block];
-    __shared__ double rzi[maxn_of_block];
-    __shared__ double ri [maxn_of_block];
-    __shared__ double rxj[maxn_of_block];
-    __shared__ double ryj[maxn_of_block];
-    __shared__ double rzj[maxn_of_block];
-    __shared__ double rj [maxn_of_block];
+    __shared__ double rxi[max_size_of_block];
+    __shared__ double ryi[max_size_of_block];
+    __shared__ double rzi[max_size_of_block];
+    __shared__ double ri [max_size_of_block];
+    __shared__ double rxj[max_size_of_block];
+    __shared__ double ryj[max_size_of_block];
+    __shared__ double rzj[max_size_of_block];
+    __shared__ double rj [max_size_of_block];
 
     const int i   = threadIdx.x + blockIdx.x * blockDim.x;
     const int tid = threadIdx.x;
