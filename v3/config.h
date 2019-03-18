@@ -36,38 +36,39 @@ typedef struct
     double rz[max_size_of_block];
     double radius[max_size_of_block];
 
-    tponeblock *extrablock;
-    } tponeblock;
+    cell_t *extrablock;
+    } cell_t;
 
 typedef struct
     {
     int    nblocks;
     intv_t nblock;
     vec_t  blocklen;
-    } tpblockargs;
+    } hyconargs_t;
 
 typedef struct
     {
-    tpblockargs    args;
-    tponeblock    *oneblocks;
-    } tpblocks;
+    hyconargs_t    args;
+    cell_t    *oneblocks;
+    } hycon_t;
 
 // subroutines for configuration 
-void alloc_con( tpvec **tcon, double **tradius, int tnatom );
-void gen_config( tpvec *tcon, double *tradius, tpbox *tbox, tpsets tsets );
-void gen_lattice_fcc ( tpvec *tcon, double *tradius, tpbox *tbox, tpsets tsets );
-void read_config( FILE *tfio, tpvec *tcon, double *tradius, tpbox *tbox );
-void write_config( FILE *tfio, tpvec *tcon, double *tradius, tpbox *tbox );
-void trim_config( tpvec *tcon, tpbox tbox );
-void calc_boxl(double *tradius, tpbox *tbox);
+void alloc_con( vec_t **tcon, double **tradius, int tnatom );
+void gen_config( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets );
+void gen_lattice_fcc ( vec_t *tcon, double *tradius, box_t *tbox, sets_t tsets );
+void read_config( FILE *tfio, vec_t *tcon, double *tradius, box_t *tbox );
+void write_config( FILE *tfio, vec_t *tcon, double *tradius, box_t *tbox );
+void trim_config( vec_t *tcon, box_t tbox );
+void calc_boxl(double *tradius, box_t *tbox);
 
-cudaError_t device_alloc_con( tpvec **tcon, double **tradius, int tnatom );
-cudaError_t gpu_trim_config( tpvec *tcon, tpbox tbox );
+cudaError_t device_alloc_con( vec_t **tcon, double **tradius, int tnatom );
+cudaError_t gpu_trim_config( vec_t *tcon, box_t tbox );
 
-void calc_nblocks( tpblocks *thdblocks, tpbox tbox );
-void recalc_nblocks( tpblocks *thdblocks, tpbox tbox );
+void calc_nblocks( hypercon_t *thdblocks, box_t tbox );
+void recalc_nblocks( hypercon_t *thdblocks, box_t tbox );
 
 // subroutines for hyperconfiguration
-cudaError_t gpu_make_hypercon();
+cudaError_t gpu_map_hypercon_con( hycon_t *thdblock, tpvec *thdcon, double *thdradius, tpbox tbox);
+cudaError_t gpu_make_hypercon( hycon_t *thdblock, tpvec *thdcon, double *thdradius, tpbox tbox);
 
 #endif
