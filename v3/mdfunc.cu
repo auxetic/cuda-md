@@ -117,15 +117,15 @@ cudaError_t gpu_update_v( tpvec *thdconv, tpvec *thdconf, tpbox tbox, double dt)
 
 // calculate force between blocki and blockj
 __global__ void kernel_calc_block_force( tpvec      *tdconf, 
-                                           tponeblock tdblocki, 
-                                           tponeblock tdblockj,  
+                                           tponeblock *tdblocki, 
+                                           tponeblock *tdblockj,  
                                            double     tlx )
     {
     __shared__ double sm_wili;
 
     const int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if ( i >= tdblocki.natom )
+    if ( i >= tdblocki->natom )
         return;
 
     if ( threadIdx.x == 0 )
@@ -135,10 +135,10 @@ __global__ void kernel_calc_block_force( tpvec      *tdconf,
 
     //int nbsum = tonelist[i].nbsum;
 
-    double xi = tdblocki.rx[i];
-    double yi = tdblocki.ry[i];
-    double zi = tdblocki.rz[i];
-    double ri = tdblocki.radius[i];
+    double xi = tdblocki->rx[i];
+    double yi = tdblocki->ry[i];
+    double zi = tdblocki->rz[i];
+    double ri = tdblocki->radius[i];
     double fx = 0.0;
     double fy = 0.0;
     double fz = 0.0;
@@ -146,12 +146,12 @@ __global__ void kernel_calc_block_force( tpvec      *tdconf,
 
     int j;
     double xj, yj, zj, rj, rij, dij, Vr;
-    for ( int jj=0; jj<tdblockj.natom; jj++ )
+    for ( int jj=0; jj<tdblockj->natom; jj++ )
         {
-        xj = tdblockj.rx[jj];
-        yj = tdblockj.ry[jj];
-        zj = tdblockj.rz[jj];
-        rj = tdblockj.radius[jj];
+        xj = tdblockj->rx[jj];
+        yj = tdblockj->ry[jj];
+        zj = tdblockj->rz[jj];
+        rj = tdblockj->radius[jj];
 
         // xij and reuse xj, yj, zj for xij, xj is xij
         xj -= xi;
@@ -178,6 +178,7 @@ __global__ void kernel_calc_block_force( tpvec      *tdconf,
             wi += - Vr * rij;
             }
         }
+
     tdconf[i].x = fx;
     tdconf[i].y = fy;
     tdconf[i].z = fz;
@@ -193,22 +194,50 @@ __global__ void kernel_calc_block_force( tpvec      *tdconf,
 
     }
 
-cudaError_t gpu_calc_force( tpvec *thdconf, tplist thdlist, tpvec *thdcon, double *thdradius, double *static_press, tpbox tbox )
+cudaError_t gpu_calc_force( tpvec *thdconf, 
+                            tpblocks thdblocks, 
+                            double *static_press, 
+                            tpbox tbox )
     {
     const int block_size = 128;
 
     const int natom = tbox.natom;
     const double lx = tbox.len.x;
 
+    const int nblocks = thdblocks.args.nblocks;
+    const int nblockx = thdblocks.args.nblock.x;
+
+
+
+    check_cuda( cudaDeviceSynchronize() );
     g_wili = 0.0;
+
+
+    tponeblock *blocki, *blockj;
+    int natomi;
+    for ( int i = 0; i < nblocks; i++ )
+        {
+        // issue // debugger
+        blocki = &thdblocks.oneblocks[i];
+        natomi = blocki->natom;
+        for( int jj = 0; jj < 25; jj++ )
+            {
+            j      = blocki->neighb[jj];
+            blockj = &thdblocks.oneblocks[j];
+
+            // debugger
+            dim3 grids( (natomi/block_size)+1, 1, 1 );
+            dim3 threads( block_size, 1, 1 );
+            kernel_calc_block_force <<< grids, threads>>>( tpvec      *tdconf, 
+                                                           tponeblock *tdblocki, 
+                                                           tponeblock *tdblockj,  
+                                                           double     tlx )
+            }
+        }
+
     check_cuda( cudaDeviceSynchronize() );
 
-    dim3 grids( (natom/block_size)+1, 1, 1 );
-    dim3 threads( block_size, 1, 1 );
-    kernel_calc_force <<< grids, threads >>>( thdconf, thdlist.onelists, thdcon, thdradius, natom, lx );
-    check_cuda( cudaDeviceSynchronize() );
-
-    *static_press = g_wili / (double ) sysdim / pow(lx, sysdim);
+    *static_press = g_wili / (double) sysdim / pow(lx, sysdim);
 
     return cudaSuccess;
     }
