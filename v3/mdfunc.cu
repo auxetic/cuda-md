@@ -115,67 +115,115 @@ cudaError_t gpu_update_v( tpvec *thdconv, tpvec *thdconf, tpbox tbox, double dt)
     }
 
 
-// calculate force between blocki and blockj
-__global__ void kernel_calc_block_force( tpvec      *tdconf, 
-                                           tponeblock *tdblocki, 
-                                           tponeblock *tdblockj,  
-                                           double     tlx )
+// calculate force of one block with all its neighbour at once
+__global__ void kernel_calc_force_all_neighb_block(   tpvec      *tdconf, 
+                                                      tponeblock *tdblocks, 
+                                                      const int         tbid, 
+                                                      const double      tlx )
     {
     __shared__ double sm_wili;
+    __shared__ double rxi[maxn_of_block];
+    __shared__ double ryi[maxn_of_block];
+    __shared__ double rzi[maxn_of_block];
+    __shared__ double ri [maxn_of_block];
+    __shared__ double rxj[maxn_of_block];
+    __shared__ double ryj[maxn_of_block];
+    __shared__ double rzj[maxn_of_block];
+    __shared__ double rj [maxn_of_block];
 
-    const int i = threadIdx.x + blockIdx.x * blockDim.x;
+    const int i   = threadIdx.x + blockIdx.x * blockDim.x;
+    const int tid = threadIdx.x;
 
-    if ( i >= tdblocki->natom )
-        return;
+    //if ( i >= tdblocki->natom )
+    //    return;
 
-    if ( threadIdx.x == 0 )
+    if ( tid.x == 0 )
         sm_wili = 0.0;
 
-    __syncthreads();
-
-    //int nbsum = tonelist[i].nbsum;
-
-    double xi = tdblocki->rx[i];
-    double yi = tdblocki->ry[i];
-    double zi = tdblocki->rz[i];
-    double ri = tdblocki->radius[i];
+    rxi[tid] = tdblocks[tbid]->rx[i];
+    ryi[tid] = tdblocks[tbid]->ry[i];
+    rzi[tid] = tdblocks[tbid]->rz[i];
+    ri [tid] = tdblocks[tbid]->radius[i];
     double fx = 0.0;
     double fy = 0.0;
     double fz = 0.0;
     double wi = 0.0;
 
+    __syncthreads();
+
     int j;
-    double xj, yj, zj, rj, rij, dij, Vr;
-    for ( int jj=0; jj<tdblockj->natom; jj++ )
+    double rxij, ryij, rzij, rij, dij, Vr;
+    //tponeblock *blocki, *blockj;
+    blocki = tdblocks[tbid];
+    // self block force
+    rxj[tid] = rxi[tid];
+    ryj[tid] = ryi[tid];
+    rzj[tid] = rzi[tid];
+    for ( int j=0; j<tdblocks[tbid].natom; j++)
         {
-        xj = tdblockj->rx[jj];
-        yj = tdblockj->ry[jj];
-        zj = tdblockj->rz[jj];
-        rj = tdblockj->radius[jj];
+        rxij  =rxj[j]-rxi[tid];
+        ryij  =ryj[j]-ryi[tid];
+        rzij  =rzj[j]-rzi[tid];
+        rxij -=round(rxij/tlx)*tlx;
+        ryij -=round(ryij/tlx)*tlx;
+        rzij -=round(rzij/tlx)*tlx;
 
-        // xij and reuse xj, yj, zj for xij, xj is xij
-        xj -= xi;
-        yj -= yi;
-        zj -= zi;
-        xj -= round(xj/tlx)*tlx;
-        yj -= round(yj/tlx)*tlx;
-        zj -= round(zj/tlx)*tlx;
-
-        rij = xj*xj + yj*yj + zj*zj;
+        rij = rxij*rxij + ryij*ryij + rzij*rzij;
         dij = ri + rj;
+        
+        if ( tid < blocki->natom && tid != j )
+            if ( rij < dij*dij )
+                {
+                rij = sqrt(rij);
 
-        if ( rij < dij*dij )
+                Vr = - ( 1.0 - rij/dij ) / dij;
+
+                fx -= - Vr * rxij / rij;
+                fy -= - Vr * ryij / rij;
+                fz -= - Vr * rzij / rij;
+
+                // wili
+                wi += - Vr * rij;
+                }
+
+        }
+    // joint block force
+    for ( int jj=0; jj<26; jj++ )
+        {
+        bidj = tdblocks[tbid].neighb[jj];
+        rxj[tid] = tdblocks[bidj].rx[tid];
+        ryj[tid] = tdblocks[bidj].ry[tid];
+        rzj[tid] = tdblocks[bidj].rz[tid];
+        rj[tid]  = tdblocks[bidj].radius[tid];
+
+        for ( int j = 0; j < tdblocks[bidj].natom; j++)
             {
-            rij = sqrt(rij);
+            rxij  =rxj[j]-rxi[tid];
+            ryij  =ryj[j]-ryi[tid];
+            rzij  =rzj[j]-rzi[tid];
+            rxij -=round(rxij/tlx)*tlx;
+            ryij -=round(ryij/tlx)*tlx;
+            rzij -=round(rzij/tlx)*tlx;
 
-            Vr = - ( 1.0 - rij/dij ) / dij;
+            rij = rxij*rxij + ryij*ryij + rzij*rzij;
+            dij = ri + rj;
 
-            fx -= - Vr * xj / rij;
-            fy -= - Vr * yj / rij;
-            fz -= - Vr * zj / rij;
+            if ( tid < tdblocks[tbid].natom )
+                {
+                if ( rij < dij*dij )
+                    {
+                    rij = sqrt(rij);
 
-            // wili
-            wi += - Vr * rij;
+                    Vr = - ( 1.0 - rij/dij ) / dij;
+
+                    fx -= - Vr * xj / rij;
+                    fy -= - Vr * yj / rij;
+                    fz -= - Vr * zj / rij;
+
+                    // wili
+                    wi += - Vr * rij;
+                    }
+                }
             }
         }
 
@@ -194,9 +242,9 @@ __global__ void kernel_calc_block_force( tpvec      *tdconf,
 
     }
 
-cudaError_t gpu_calc_force( tpvec *thdconf, 
-                            tpblocks thdblocks, 
-                            double *static_press, 
+cudaError_t gpu_calc_force( tpvec    *thdconf, 
+                            tpblocks *thdblocks, 
+                            double   *static_press, 
                             tpbox tbox )
     {
     const int block_size = 128;
@@ -207,32 +255,16 @@ cudaError_t gpu_calc_force( tpvec *thdconf,
     const int nblocks = thdblocks.args.nblocks;
     const int nblockx = thdblocks.args.nblock.x;
 
-
-
     check_cuda( cudaDeviceSynchronize() );
     g_wili = 0.0;
 
 
-    tponeblock *blocki, *blockj;
-    int natomi;
+    tponeblock *block;
     for ( int i = 0; i < nblocks; i++ )
         {
-        // issue // debugger
-        blocki = &thdblocks.oneblocks[i];
-        natomi = blocki->natom;
-        for( int jj = 0; jj < 25; jj++ )
-            {
-            j      = blocki->neighb[jj];
-            blockj = &thdblocks.oneblocks[j];
-
-            // debugger
-            dim3 grids( (natomi/block_size)+1, 1, 1 );
-            dim3 threads( block_size, 1, 1 );
-            kernel_calc_block_force <<< grids, threads>>>( tpvec      *tdconf, 
-                                                           tponeblock *tdblocki, 
-                                                           tponeblock *tdblockj,  
-                                                           double     tlx )
-            }
+        grids   = (nblocks/block_size)+1;
+        threads = block_size;
+        kernel_calc_force_all_neighb_block <<<grids, threads >>> ( thdconf, thdblocks.oneblocks, i, lx);
         }
 
     check_cuda( cudaDeviceSynchronize() );

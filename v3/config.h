@@ -12,6 +12,7 @@
 #include "system.h"
 #include "common.h"
 
+// max member of a block
 #define maxn_of_block 128
 #define mean_of_block 64
 
