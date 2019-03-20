@@ -41,6 +41,7 @@ int main(void)
 
 
     gpu_calc_force( conf, &hycon, &press, box );
+    printf("%26.16e\n", press);
 
     fptr= fopen("i_conf.dat", "w+");
     write_config( fptr, conf, radius, &box );

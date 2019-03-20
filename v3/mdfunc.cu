@@ -111,29 +111,13 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
 
     if ( i == 3 )
         {
-        //sm_wili /= (double ) sysdim;
         atomicAdd( &g_wili, sm_wili );
         }
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 cudaError_t gpu_calc_force( vec_t   *conf, 
                             hycon_t *hycon, 
-                            double  *static_press, 
+                            double  *press, 
                             box_t    box )
     {
     const int block_size = (int) pow(2.0, ceil(sqrt((double)max_size_of_cell)));
@@ -159,32 +143,10 @@ cudaError_t gpu_calc_force( vec_t   *conf,
 
     check_cuda( cudaDeviceSynchronize() );
 
-    *static_press = g_wili / (double) sysdim / pow(lx, sysdim);
+    *press = g_wili / (double) sysdim / pow(lx, sysdim);
 
     return cudaSuccess;
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 __global__ void kernel_calc_fmax( vec_t *conf, int natom )
     {
@@ -228,3 +190,4 @@ double gpu_calc_fmax( vec_t *conf, box_t box )
     check_cuda( cudaDeviceSynchronize() );
 
     }
+
