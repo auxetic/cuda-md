@@ -27,21 +27,21 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
 
     double rxij, ryij, rzij, rij, dij, Vr;
     // self block force
-    for ( int j=0; j<blocki.natom; j++)
+    if ( i < blocki.natom )
         {
-        rxij  =blocki.rx[j]-blocki.rx[i];
-        ryij  =blocki.ry[j]-blocki.ry[i];
-        rzij  =blocki.rz[j]-blocki.rz[i];
-        rxij -=round(rxij/lx)*lx;
-        ryij -=round(ryij/lx)*lx;
-        rzij -=round(rzij/lx)*lx;
-
-        rij = rxij*rxij + ryij*ryij + rzij*rzij;
-        dij = blocki.radius[j] + blocki.radius[i];
-        
-        if ( i < blocki.natom && i != j )
+        for ( int j=0; j<blocki.natom; j++)
             {
-            if ( rij < dij*dij )
+            rxij  = blocki.rx[j]-blocki.rx[i];
+            ryij  = blocki.ry[j]-blocki.ry[i];
+            rzij  = blocki.rz[j]-blocki.rz[i];
+            rxij -= round(rxij/lx)*lx;
+            ryij -= round(ryij/lx)*lx;
+            rzij -= round(rzij/lx)*lx;
+
+            rij = rxij*rxij + ryij*ryij + rzij*rzij;
+            dij = blocki.radius[j] + blocki.radius[i];
+            
+            if ( rij < dij*dij && i != j)
                 {
                 rij = sqrt(rij);
 
@@ -55,30 +55,30 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
                 wi += - Vr * rij;
                 }
             }
-
         }
 
     // joint block force
-    int bidj;
     for ( int jj=0; jj<26; jj++ )
         {
-        bidj     = blocks[bidi].neighb[jj];
-        blockj   = blocks[bidj];
+        if ( i == blockDim.x - 1 )
+            blockj = blocks[blocki.neighb[jj]];
 
-        for ( int j = 0; j < blockj.natom; j++)
+        __syncthreads();
+
+        if ( i < blocki.natom )
             {
-            rxij  =blockj.rx[j]-blocki.rx[i];
-            ryij  =blockj.ry[j]-blocki.ry[i];
-            rzij  =blockj.rz[j]-blocki.rz[i];
-            rxij -=round(rxij/lx)*lx;
-            ryij -=round(ryij/lx)*lx;
-            rzij -=round(rzij/lx)*lx;
-
-            rij = rxij*rxij + ryij*ryij + rzij*rzij;
-            dij = blocki.radius[i] + blockj.radius[j];
-
-            if ( i < blocki.natom )
+            for ( int j = 0; j < blockj.natom; j++)
                 {
+                rxij  = blockj.rx[j]-blocki.rx[i];
+                ryij  = blockj.ry[j]-blocki.ry[i];
+                rzij  = blockj.rz[j]-blocki.rz[i];
+                rxij -= round(rxij/lx)*lx;
+                ryij -= round(ryij/lx)*lx;
+                rzij -= round(rzij/lx)*lx;
+
+                rij = rxij*rxij + ryij*ryij + rzij*rzij;
+                dij = blocki.radius[i] + blockj.radius[j];
+
                 if ( rij < dij*dij )
                     {
                     rij = sqrt(rij);
@@ -96,19 +96,24 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
             }
         }
 
-    conf[i].x = fx;
-    conf[i].y = fy;
-    conf[i].z = fz;
+    int iatom;
+    if ( i < blocki.natom )
+        {
+        iatom = blocki.tag[i];
+        conf[iatom].x = fx;
+        conf[iatom].y = fy;
+        conf[iatom].z = fz;
 
-    atomicAdd( &sm_wili, wi );
+        atomicAdd( &sm_wili, wi );
+        }
 
     __syncthreads();
-    if ( i  == 3 )
+
+    if ( i == 3 )
         {
         //sm_wili /= (double ) sysdim;
         atomicAdd( &g_wili, sm_wili );
         }
-
     }
 
 
@@ -143,7 +148,7 @@ cudaError_t gpu_calc_force( vec_t   *conf,
     g_wili = 0.0;
 
     int grids, threads;
-    printf("desine block_size is %d / %d\n", block_size, nblocks);
+    printf("desine block_size is %d x %d\n", block_size, nblocks);
     for ( int i = 0; i < nblocks; i++ )
         {
         // should optimise to consider number of threads exceed maxisum size of a GPU block
