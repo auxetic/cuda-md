@@ -3,62 +3,43 @@
 __managed__ double g_fmax;
 __managed__ double g_wili;
 
-<<<<<<< HEAD
-
-
 // calculate force of one block with all its neighbour at once
 __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf, 
                                                     block_t      *blocks, 
-                                                    const int    tbid, 
-                                                    const double tlx )
+                                                    const int    bidi, 
+                                                    const double lx )
     {
     __shared__ double sm_wili;
+    __shared__ block_t blocki, blockj;
 
-    __shared__ block_t block_core;
-    __shared__ block_t block_edge;
+    const int i = threadIdx.x;
+    //const int i   = threadIdx.x + blockIdx.x * blockDim.x;
 
-    const int i   = threadIdx.x + blockIdx.x * blockDim.x;
-    const int tid = threadIdx.x;
-
-    if ( tid == 0 ) sm_wili = 0.0;
-
-    rxi[tid] = tdblocks[tbid].rx[i];
-    ryi[tid] = tdblocks[tbid].ry[i];
-    rzi[tid] = tdblocks[tbid].rz[i];
-    ri [tid] = tdblocks[tbid].radius[i];
     double fx = 0.0;
     double fy = 0.0;
     double fz = 0.0;
     double wi = 0.0;
 
+    if ( i == 0 ) sm_wili = 0.0;
+    if ( i == 1 ) blocki = blocks[bidi];
+
     __syncthreads();
 
-    int j;
     double rxij, ryij, rzij, rij, dij, Vr;
-<<<<<<< HEAD
-    //block_t *blocki, *blockj;
-    blocki = tdblocks[tbid];
-=======
-    cell_t *blocki, *blockj;
-    blocki = &tdblocks[tbid];
->>>>>>> debug
     // self block force
-    rxj[tid] = rxi[tid];
-    ryj[tid] = ryi[tid];
-    rzj[tid] = rzi[tid];
-    for ( int j=0; j<tdblocks[tbid].natom; j++)
+    for ( int j=0; j<blocki.natom; j++)
         {
-        rxij  =rxj[j]-rxi[tid];
-        ryij  =ryj[j]-ryi[tid];
-        rzij  =rzj[j]-rzi[tid];
-        rxij -=round(rxij/tlx)*tlx;
-        ryij -=round(ryij/tlx)*tlx;
-        rzij -=round(rzij/tlx)*tlx;
+        rxij  =blocki.rx[j]-blocki.rx[i];
+        ryij  =blocki.ry[j]-blocki.ry[i];
+        rzij  =blocki.rz[j]-blocki.rz[i];
+        rxij -=round(rxij/lx)*lx;
+        ryij -=round(ryij/lx)*lx;
+        rzij -=round(rzij/lx)*lx;
 
         rij = rxij*rxij + ryij*ryij + rzij*rzij;
-        dij = ri[tid] + rj[j];
+        dij = blocki.radius[j] + blocki.radius[i];
         
-        if ( tid < blocki->natom && tid != j )
+        if ( i < blocki.natom && i != j )
             {
             if ( rij < dij*dij )
                 {
@@ -76,29 +57,27 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
             }
 
         }
+
     // joint block force
     int bidj;
     for ( int jj=0; jj<26; jj++ )
         {
-        bidj = tdblocks[tbid].neighb[jj];
-        rxj[tid] = tdblocks[bidj].rx[tid];
-        ryj[tid] = tdblocks[bidj].ry[tid];
-        rzj[tid] = tdblocks[bidj].rz[tid];
-        rj[tid]  = tdblocks[bidj].radius[tid];
+        bidj     = blocks[bidi].neighb[jj];
+        blockj   = blocks[bidj];
 
-        for ( int j = 0; j < tdblocks[bidj].natom; j++)
+        for ( int j = 0; j < blockj.natom; j++)
             {
-            rxij  =rxj[j]-rxi[tid];
-            ryij  =ryj[j]-ryi[tid];
-            rzij  =rzj[j]-rzi[tid];
-            rxij -=round(rxij/tlx)*tlx;
-            ryij -=round(ryij/tlx)*tlx;
-            rzij -=round(rzij/tlx)*tlx;
+            rxij  =blockj.rx[j]-blocki.rx[i];
+            ryij  =blockj.ry[j]-blocki.ry[i];
+            rzij  =blockj.rz[j]-blocki.rz[i];
+            rxij -=round(rxij/lx)*lx;
+            ryij -=round(ryij/lx)*lx;
+            rzij -=round(rzij/lx)*lx;
 
             rij = rxij*rxij + ryij*ryij + rzij*rzij;
-            dij = ri[tid] + rj[j];
+            dij = blocki.radius[i] + blockj.radius[j];
 
-            if ( tid < tdblocks[tbid].natom )
+            if ( i < blocki.natom )
                 {
                 if ( rij < dij*dij )
                     {
@@ -124,7 +103,7 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
     atomicAdd( &sm_wili, wi );
 
     __syncthreads();
-    if ( threadIdx.x == 0 )
+    if ( i  == 3 )
         {
         //sm_wili /= (double ) sysdim;
         atomicAdd( &g_wili, sm_wili );
@@ -133,34 +112,44 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
     }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 cudaError_t gpu_calc_force( vec_t   *conf, 
                             hycon_t *hycon, 
                             double  *static_press, 
-                            box_t   box )
+                            box_t    box )
     {
-    const int block_size = 128;
+    const int block_size = (int) pow(2.0, ceil(sqrt((double)max_size_of_cell)));
 
     const int natom = box.natom;
     const double lx = box.len.x;
 
-    const int nblocks = thdblocks->args.nblocks;
-    const int nblockx = thdblocks->args.nblock.x;
+    const int nblocks = hycon->args.nblocks;
+    const int nblockx = hycon->args.nblock.x;
 
     check_cuda( cudaDeviceSynchronize() );
     g_wili = 0.0;
 
-
-    block_t *block;
     int grids, threads;
+    printf("desine block_size is %d / %d\n", block_size, nblocks);
     for ( int i = 0; i < nblocks; i++ )
         {
-        grids   = (nblocks/block_size)+1;
+        // should optimise to consider number of threads exceed maxisum size of a GPU block
+        grids   = 1;
         threads = block_size;
-<<<<<<< HEAD
-        kernel_calc_force_all_neighb_block <<<grids, threads >>> ( conf, thdblocks.oneblocks, i, lx);
-=======
-        kernel_calc_force_all_neighb_block <<<grids, threads >>> ( thdconf, thdblocks->oneblocks, i, lx);
->>>>>>> debug
+        kernel_calc_force_all_neighb_block <<<grids, threads >>> ( conf, hycon->blocks, i, lx);
         }
 
     check_cuda( cudaDeviceSynchronize() );
@@ -171,7 +160,27 @@ cudaError_t gpu_calc_force( vec_t   *conf,
     }
 
 
-<<<<<<< HEAD
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 __global__ void kernel_calc_fmax( vec_t *conf, int natom )
     {
     __shared__ double block_f[256];
@@ -212,7 +221,5 @@ double gpu_calc_fmax( vec_t *conf, box_t box )
     dim3 threads( block_size, 1, 1);
     kernel_calc_fmax <<< grids, threads >>> ( conf, natom );
     check_cuda( cudaDeviceSynchronize() );
-=======
 
->>>>>>> debug
-
+    }

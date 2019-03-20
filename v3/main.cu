@@ -7,6 +7,7 @@
 
 #include "system.h"
 #include "config.h"
+#include "mdfunc.h"
 
 int main(void)
     {
@@ -17,18 +18,33 @@ int main(void)
     sets.seed = 1;
     cudaSetDevice(0);
 
+    double  press = 0.0;
     double  *radius = NULL;
     vec_t   *con    = NULL;
+    vec_t   *conf   = NULL;
     check_cuda( cudaMallocManaged( &con,     box.natom*sizeof(vec_t)  ) );
+    check_cuda( cudaMallocManaged( &conf,    box.natom*sizeof(vec_t)  ) );
     check_cuda( cudaMallocManaged( &radius , box.natom*sizeof(double) ) );
     gen_config( con, radius, &box, sets );
 
     hycon_t hycon;
     calc_hypercon_args( &hycon, box );
-    check_cuda( cudaMallocManaged( &hycon.oneblocks, hycon.args.nblocks*sizeof(block_t) ) );
+    check_cuda( cudaMallocManaged( &hycon.blocks, hycon.args.nblocks*sizeof(block_t) ) );
     printf("h\n");//debug
     gpu_make_hypercon( hycon, con, radius, box);
     map( hycon );
+
+
+    FILE *fptr= fopen("i_con.dat", "w+");
+    write_config( fptr, con, radius, &box );
+    fclose(fptr);
+
+
+    gpu_calc_force( conf, &hycon, &press, box );
+
+    fptr= fopen("i_conf.dat", "w+");
+    write_config( fptr, conf, radius, &box );
+    fclose(fptr);
 
     return 0;
     }

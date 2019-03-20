@@ -13,8 +13,8 @@
 #include "common.h"
 
 // max size of a block
-#define max_size_of_block 20
-#define mean_size_of_block 12
+#define max_size_of_cell 20
+#define mean_size_of_cell 12
 
 // block type to make up hyperconfiguration
 typedef struct block_t
@@ -22,11 +22,11 @@ typedef struct block_t
     int    natom;
     int    neighb[26];
 
-    double rx[max_size_of_block];
-    double ry[max_size_of_block];
-    double rz[max_size_of_block];
-    double radius[max_size_of_block];
-    int    tag[max_size_of_block];
+    double rx[max_size_of_cell];
+    double ry[max_size_of_cell];
+    double rz[max_size_of_cell];
+    double radius[max_size_of_cell];
+    int    tag[max_size_of_cell];
 
     bool   extraflag;
     struct block_t *extra = NULL;
@@ -34,6 +34,7 @@ typedef struct block_t
 
 typedef struct
     {
+    int    natom;
     int    nblocks;
     intv_t nblock;
     vec_t  blocklen;

@@ -215,7 +215,7 @@ void trim_config( vec_t *con, box_t box )
 void calc_hypercon_args( hycon_t *hycon, box_t box )
     {
     // numbers of blocks in xyz dimension
-    int nblockx = ceil( cbrt ( (double)box.natom / mean_size_of_block ) );
+    int nblockx = ceil( cbrt ( (double)box.natom / mean_size_of_cell ) );
 
     // sum number of blocks
     int nblocks = nblockx * nblockx * nblockx;
@@ -228,12 +228,13 @@ void calc_hypercon_args( hycon_t *hycon, box_t box )
     if ( dlx < ratio ) printf("#WARNING TOO SMALL HYPERCON BLOCK SIZE FOR FORCE CUTOFF\n");
 
     hycon->args.nblocks  = nblocks;
-    hycon->args.nblock.x = nblocx;
-    hycon->args.nblock.y = nblocx;
-    hycon->args.nblock.z = nblocx;
+    hycon->args.nblock.x = nblockx;
+    hycon->args.nblock.y = nblockx;
+    hycon->args.nblock.z = nblockx;
     hycon->args.dl.x     = dlx;
     hycon->args.dl.y     = dly;
     hycon->args.dl.z     = dlz;
+    hycon->args.natom    = box.natom;
     }
 
 void recalc_hypercon_args( hycon_t *hycon, box_t box )
@@ -429,7 +430,7 @@ __global__ void kernel_make_hypercon( block_t *blocks,
           +(int) floor((rz + 0.5) * (double)nblockx ) * nblockx * nblockx;
 
     int idxinblock = atomicAdd( &blocks[bid].natom, 1);
-    if ( idxinblock < max_size_of_block - 2 )
+    if ( idxinblock < max_size_of_cell - 2 )
         {
         blocks[bid].rx[idxinblock]     = x;
         blocks[bid].ry[idxinblock]     = y;
@@ -467,7 +468,7 @@ cudaError_t gpu_make_hypercon( hycon_t hycon, vec_t *con, double *radius, box_t 
         block = &hycon.blocks[i];
 
         block->natom = 0;
-        threads = max_size_of_block;
+        threads = max_size_of_cell;
         kernel_reset_hypercon_block <<<1, threads>>> (block);
         }
     check_cuda( cudaDeviceSynchronize() );
@@ -519,7 +520,7 @@ cudaError_t gpu_map_hypercon_con( hycon_t *hycon, vec_t *con, double *radius, bo
         {
         block = &hycon->blocks[i];
         grids = 1;
-        threads = max_size_of_block;
+        threads = max_size_of_cell;
         kernel_map_hypercon_con<<<grids, threads>>>(block, con, radius);
         }
     check_cuda( cudaDeviceSynchronize() );
