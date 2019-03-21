@@ -393,6 +393,7 @@ __global__ void kernel_reset_hypercon_block(block_t *block)
     block->ry[i]     = 0.0;
     block->rz[i]     = 0.0;
     block->radius[i] = 0.0;
+    block->extraflag = 0;
     block->tag[i]    = -1;
     }
 
@@ -430,7 +431,7 @@ __global__ void kernel_make_hypercon( block_t *blocks,
           +(int) floor((rz + 0.5) * (double)nblockx ) * nblockx * nblockx;
 
     int idxinblock = atomicAdd( &blocks[bid].natom, 1);
-    if ( idxinblock < max_size_of_cell - 2 )
+    if ( idxinblock < max_size_of_cell - 1 )
         {
         blocks[bid].rx[idxinblock]     = x;
         blocks[bid].ry[idxinblock]     = y;
@@ -442,6 +443,7 @@ __global__ void kernel_make_hypercon( block_t *blocks,
         {
         // TODO one should consider those exced the max number of atoms per blocks
         atomicSub( &blocks[bid].natom, 1 );
+        atomicAdd( &blocks[bid].extraflag, 1 );
         //idxinblock = atomicAdd( &blocks[bid]->extra.natom, 1);
         //blocks[bid]->extra.rx[idxinblock]     = x;
         //blocks[bid]->extra.ry[idxinblock]     = y;
@@ -487,6 +489,13 @@ cudaError_t gpu_make_hypercon( hycon_t hycon, vec_t *con, double *radius, box_t 
                                                 nblockx,
                                                 natom );
     check_cuda( cudaDeviceSynchronize() );
+    
+    // check hypercon validation // if nnumber of atoms exceeds max cell size
+    for ( int i = 0; i < nblocks; i++ )
+        {
+        if(hycon.blocks[i].extraflag > 0)
+            printf("#WARNING hypercon has excess atoms\n");
+        }
 
     return cudaSuccess;
     }

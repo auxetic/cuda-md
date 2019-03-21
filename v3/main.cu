@@ -12,7 +12,7 @@
 int main(void)
     {
     box_t  box;
-    box.natom = 128;
+    box.natom = 16384;
     box.phi   = 0.88;
     sets_t sets;
     sets.seed = 1;

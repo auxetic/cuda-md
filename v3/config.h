@@ -13,7 +13,7 @@
 #include "common.h"
 
 // max size of a block
-#define max_size_of_cell 20
+#define max_size_of_cell 30
 #define mean_size_of_cell 12
 
 // block type to make up hyperconfiguration
@@ -28,7 +28,7 @@ typedef struct block_t
     double radius[max_size_of_cell];
     int    tag[max_size_of_cell];
 
-    bool   extraflag;
+    int    extraflag;
     struct block_t *extra = NULL;
     } block_t;
 
