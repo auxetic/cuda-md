@@ -5,13 +5,13 @@ __managed__ double g_wili;
 
 // calculate force of one block with all its neighbour at once
 __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf, 
-                                                    block_t      *blocks, 
+                                                    cell_t      *blocks, 
                                                     const int    bidi, 
                                                     const double lx )
     {
     const int tid = threadIdx.x;
 
-    __shared__ block_t blocki, blockj;
+    __shared__ cell_t blocki, blockj;
     __shared__ double  fx[max_size_of_cell];
     __shared__ double  fy[max_size_of_cell];
     __shared__ double  fz[max_size_of_cell];

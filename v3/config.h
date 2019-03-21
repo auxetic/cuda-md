@@ -17,7 +17,7 @@
 #define mean_size_of_cell 12
 
 // block type to make up hyperconfiguration
-typedef struct block_t
+typedef struct cell_t
     {
     int    natom;
     int    neighb[26];
@@ -28,9 +28,23 @@ typedef struct block_t
     double radius[max_size_of_cell];
     int    tag[max_size_of_cell];
 
+    double vx[max_size_of_cell];
+    double vy[max_size_of_cell];
+    double vz[max_size_of_cell];
+
     int    extraflag;
-    struct block_t *extra = NULL;
-    } block_t;
+    struct cell_t *extra = NULL;
+    } cell_t;
+
+typedef struct 
+    {
+    double fx[max_size_of_cell];
+    double fy[max_size_of_cell];
+    double fz[max_size_of_cell];
+
+    int    extraflag;
+    struct cell_t *extra = NULL;
+    } dyn_t;
 
 typedef struct
     {
@@ -44,7 +58,8 @@ typedef struct
 typedef struct
     {
     hycon_args_t args;
-    block_t      *blocks;
+    cell_t      *blocks;
+    dyn_t       *forces;
     } hycon_t;
 
 // subroutines for configuration

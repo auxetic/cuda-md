@@ -323,7 +323,7 @@ cudaError_t alloc_managed_con( vec_t *con, double *radius, int natom )
 cudaError_t alloc_managed_hypercon( hycon_t *hycon )
     {
     int nblocks = hycon->args.nblocks;
-    check_cuda( cudaMallocManaged( &hycon->blocks, nblocks*sizeof(block_t) ) );
+    check_cuda( cudaMallocManaged( &hycon->blocks, nblocks*sizeof(cell_t) ) );
     return cudaSuccess;
     }
 
@@ -385,7 +385,7 @@ __inline__ __device__ int indexb( double rx, double ry, double rz, double lx, in
     }
 
 
-__global__ void kernel_reset_hypercon_block(block_t *block)
+__global__ void kernel_reset_hypercon_block(cell_t *block)
     {
     const int i = threadIdx.x;
 
@@ -398,7 +398,7 @@ __global__ void kernel_reset_hypercon_block(block_t *block)
     }
 
 // calculte index of each atom and register it into block structure // map config into hyperconfig
-__global__ void kernel_make_hypercon( block_t *blocks,
+__global__ void kernel_make_hypercon( cell_t *blocks,
                                       vec_t   *con,
                                       double  *radius,
                                       double  lx,
@@ -464,7 +464,7 @@ cudaError_t gpu_make_hypercon( hycon_t hycon, vec_t *con, double *radius, box_t 
     int grids, threads;
 
     //reset hypercon
-    block_t *block;
+    cell_t *block;
     for ( int i = 0; i < nblocks; i++ )
         {
         block = &hycon.blocks[i];
@@ -501,7 +501,7 @@ cudaError_t gpu_make_hypercon( hycon_t hycon, vec_t *con, double *radius, box_t 
     }
 
 
-__global__ void kernel_map_hypercon_con (block_t *block, vec_t *con, double *radius)
+__global__ void kernel_map_hypercon_con (cell_t *block, vec_t *con, double *radius)
     {
     const int tid = threadIdx.x;
 
@@ -524,7 +524,7 @@ cudaError_t gpu_map_hypercon_con( hycon_t *hycon, vec_t *con, double *radius, bo
 
     //map hypercon into normal con with index of atom unchanged
     int grids, threads;
-    block_t *block;
+    cell_t *block;
     for ( int i = 0; i < nblocks; i++ )
         {
         block = &hycon->blocks[i];

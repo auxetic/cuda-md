@@ -29,7 +29,7 @@ int main(void)
 
     hycon_t hycon;
     calc_hypercon_args( &hycon, box );
-    check_cuda( cudaMallocManaged( &hycon.blocks, hycon.args.nblocks*sizeof(block_t) ) );
+    check_cuda( cudaMallocManaged( &hycon.blocks, hycon.args.nblocks*sizeof(cell_t) ) );
     printf("h\n");//debug
     gpu_make_hypercon( hycon, con, radius, box);
     map( hycon );
