@@ -7,21 +7,24 @@ __managed__ double g_wili;
 __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf, 
                                                     block_t      *blocks, 
                                                     const int    bidi, 
-                                                    const double lx )
+                                                    const double lx,
+                                                    const int    block_size)
     {
     __shared__ double sm_wili;
     __shared__ block_t blocki, blockj;
 
-    const int i = threadIdx.x;
-    //const int i   = threadIdx.x + blockIdx.x * blockDim.x;
+    __shared__ double fx[max_size_of_block];
+    __shared__ double fy[max_size_of_block];
+    __shared__ double fz[max_size_of_block];
+    __shared__ double wi[max_size_of_block];
 
-    double fx = 0.0;
-    double fy = 0.0;
-    double fz = 0.0;
-    double wi = 0.0;
+    const int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    const int i   = threadIdx.x / block_size;
+    const int j   = threadIdx.x % block_size;
 
     if ( i == 0 ) sm_wili = 0.0;
     if ( i == 1 ) blocki = blocks[bidi];
+    if ()
 
     __syncthreads();
 
@@ -133,12 +136,16 @@ cudaError_t gpu_calc_force( vec_t   *conf,
 
     int grids, threads;
     printf("desine block_size is %d x %d\n", block_size, nblocks);
+    grids   = 1;
+    threads = block_size * block_size;
+    if ( threads > 1024 ) 
+        {
+        printf("cell size too big\n");
+        }
     for ( int i = 0; i < nblocks; i++ )
         {
         // should optimise to consider number of threads exceed maxisum size of a GPU block
-        grids   = 1;
-        threads = block_size;
-        kernel_calc_force_all_neighb_block <<<grids, threads >>> ( conf, hycon->blocks, i, lx);
+        kernel_calc_force_all_neighb_block <<<grids, threads >>> ( conf, hycon->blocks, i, lx, block_size);
         }
 
     check_cuda( cudaDeviceSynchronize() );
