@@ -1,206 +1,165 @@
 #include "mdfunc.h"
 
-#define BLOCK_SIZE_256  256
-#define BLOCK_SIZE_512  512
-#define BLOCK_SIZE_1024 1024
-
 __managed__ double g_fmax;
 __managed__ double g_wili;
 
-
-__global__ void kernel_zero_confv( vec_t *thdconfv, int tnatom )
+// calculate force of one block with all its neighbour at once
+__global__ void kernel_calc_force_all_neighb_block( vec_t        *conf, 
+                                                    cell_t       *blocks, 
+                                                    const double lx )
     {
-    const int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if ( i < tnatom )
+    const int bidi = blockIdx.x;
+    const int tid  = threadIdx.x;
+
+    __shared__ cell_t         blocki, blockj;
+    __shared__ double         fx[max_size_of_cell];
+    __shared__ double         fy[max_size_of_cell];
+    __shared__ double         fz[max_size_of_cell];
+    __shared__ double  extern wi[];
+
+    if ( tid == 0 ) blocki = blocks[bidi];
+    if ( tid < (int) sqrt((double) blockDim.x) ) wi[tid] = 0.0;
+    if ( tid < max_size_of_cell ) 
         {
-        thdconfv[i].x = 0.0;
-        thdconfv[i].y = 0.0;
+        fx[tid] = 0.0;
+        fy[tid] = 0.0;
+        fz[tid] = 0.0;
         }
-    }
-
-cudaError_t gpu_zero_confv( vec_t *thdconfv, box_t tbox )
-    {
-    const int block_size = 256;
-    const int natom = tbox.natom;
-
-    dim3 grids( (natom/block_size)+1, 1, 1 );
-    dim3 threads( block_size, 1, 1 );
-
-    kernel_zero_confv <<< grids, threads >>> ( thdconfv, natom );
-
-    check_cuda( cudaDeviceSynchronize() );
-
-    return cudaSuccess;
-    }
-
-
-__global__ void kernel_update_vr( vec_t *thdcon, vec_t *thdconv, vec_t *thdconf, int tnatom, double dt )
-    {
-    const int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if ( i < tnatom )
-        {
-        vec_t ra, va, fa;
-
-        ra = thdcon[i];
-        va = thdconv[i];
-        fa = thdconf[i];
-
-        va.x += 0.5 * fa.x * dt;
-        va.y += 0.5 * fa.y * dt;
-        ra.x += va.x * dt;
-        ra.y += va.y * dt;
-
-        thdconv[i] = va;
-        thdcon[i]  = ra;
-        }
-    }
-
-cudaError_t gpu_update_vr( vec_t *thdcon, vec_t *thdconv, vec_t *thdconf, box_t tbox, double dt)
-    {
-    const int block_size = 256;
-
-    const int natom = tbox.natom;
-
-    dim3 grids( (natom/block_size)+1, 1, 1 );
-    dim3 threads( block_size, 1, 1 );
-    kernel_update_vr <<< grids, threads >>> ( thdcon, thdconv, thdconf, natom, dt );
-    check_cuda( cudaDeviceSynchronize() );
-
-    return cudaSuccess;
-    }
-
-
-__global__ void kernel_update_v( vec_t *thdconv, vec_t *thdconf, int tnatom, double hfdt )
-    {
-    const int i = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if ( i < tnatom )
-        {
-        vec_t va, fa;
-        va    = thdconv[i];
-        fa    = thdconf[i];
-        va.x += fa.x * hfdt;
-        va.y += fa.y * hfdt;
-        thdconv[i] = va;
-        }
-    }
-
-cudaError_t gpu_update_v( vec_t *thdconv, vec_t *thdconf, box_t tbox, double dt)
-    {
-    const int block_size = BLOCK_SIZE_256;
-
-    const int natom = tbox.natom;
-    const double hfdt = 0.5 * dt;
-
-    dim3 grids( (natom/block_size)+1, 1, 1 );
-    dim3 threads( block_size, 1, 1 );
-    kernel_update_v <<< grids, threads >>> ( thdconv, thdconf, natom, hfdt );
-    check_cuda( cudaDeviceSynchronize() );
-
-    return cudaSuccess;
-    }
-
-
-__global__ void kernel_calc_force( vec_t *thdconf, onelist_t *tonelist, vec_t *thdcon, double *thdradius, int tnatom, double tlx )
-    {
-    __shared__ double sm_wili;
-
-    const int i = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if ( i >= tnatom )
-        return;
-
-    if ( threadIdx.x == 0 )
-        sm_wili = 0.0;
 
     __syncthreads();
 
-    int nbsum = tonelist[i].nbsum;
+    const int i   = tid % blocki.natom;
+    const int j   = tid / blocki.natom;
 
-    vec_t  rai = thdcon[i];
-    vec_t  fai = { 0.0, 0.0 };
-    double ri  = thdradius[i];
-    double wi  = 0.0;
-
-    for ( int jj=0; jj<nbsum; jj++ )
+    // self block force
+    if ( tid < blocki.natom*blocki.natom && i != j )
         {
-        int j = tonelist[i].nb[jj];
+        double rxij  = blocki.r[j].x-blocki.r[i].x;
+        double ryij  = blocki.r[j].y-blocki.r[i].y;
+        double rzij  = blocki.r[j].z-blocki.r[i].z;
+        rxij -= round(rxij/lx)*lx;
+        ryij -= round(ryij/lx)*lx;
+        rzij -= round(rzij/lx)*lx;
 
-        vec_t raj = thdcon[j];
-        // dij equal to raidius of atom j
-        double rj = thdradius[j];
-
-        // xij
-        raj.x -= rai.x;
-        raj.y -= rai.y;
-        raj.x -= round(raj.x/tlx)*tlx;
-        raj.y -= round(raj.y/tlx)*tlx;
-
-        double rij = raj.x*raj.x + raj.y*raj.y;
-        double dij = ri + rj;
-
+        double rij = rxij*rxij + ryij*ryij + rzij*rzij;
+        double dij = blocki.radius[j] + blocki.radius[i];
+        
         if ( rij < dij*dij )
             {
             rij = sqrt(rij);
 
             double Vr = - ( 1.0 - rij/dij ) / dij;
 
-            fai.x -= - Vr * raj.x / rij;
-            fai.y -= - Vr * raj.y / rij;
+            atomicAdd(&fx[i], + Vr * rxij / rij);
+            atomicAdd(&fy[i], + Vr * ryij / rij);
+            atomicAdd(&fz[i], + Vr * rzij / rij);
 
-            // wili
-            wi += - Vr * rij;
+            atomicAdd(&wi[i], - Vr * rij);
             }
         }
-    thdconf[i] = fai;
 
-    atomicAdd( &sm_wili, wi );
-
-    __syncthreads();
-    if ( threadIdx.x == 0 )
+    // joint block force
+    for ( int jj=0; jj<26; jj++ )
         {
-        sm_wili /= 2.0;
-        atomicAdd( &g_wili, sm_wili );
+        if ( tid == 0 )
+            blockj = blocks[blocki.neighb[jj]];
+        __syncthreads();
+
+        if ( tid < blocki.natom*blockj.natom )
+            {
+            double rxij  = blockj.r[j].x-blocki.r[i].x;
+            double ryij  = blockj.r[j].y-blocki.r[i].y;
+            double rzij  = blockj.r[j].z-blocki.r[i].z;
+            rxij -= round(rxij/lx)*lx;
+            ryij -= round(ryij/lx)*lx;
+            rzij -= round(rzij/lx)*lx;
+
+            double rij = rxij*rxij + ryij*ryij + rzij*rzij;
+            double dij = blocki.radius[i] + blockj.radius[j];
+
+            if ( rij < dij*dij )
+                {
+                rij = sqrt(rij);
+
+                double Vr = - ( 1.0 - rij/dij ) / dij;
+
+                atomicAdd(&fx[i], + Vr * rxij / rij);
+                atomicAdd(&fy[i], + Vr * ryij / rij);
+                atomicAdd(&fz[i], + Vr * rzij / rij);
+
+                atomicAdd(&wi[i], - Vr * rij);
+                }
+            }
         }
 
+    int s = (int)sqrt((double)blockDim.x) / 2;
+    while ( tid < s )
+        {
+        __syncthreads();
+        wi[tid] += wi[tid+s];
+        s >>= 1;
+        }
+
+    if ( tid < blocki.natom )
+        {
+        int iatom = blocki.tag[tid];
+        conf[iatom].x = fx[tid];
+        conf[iatom].y = fy[tid];
+        conf[iatom].z = fz[tid];
+        }
+
+    __syncthreads();
+
+    if ( tid == 0 )
+        {
+        atomicAdd(&g_wili, wi[0]);
+        }
     }
 
-cudaError_t gpu_calc_force( vec_t *thdconf, list_t thdlist, vec_t *thdcon, double *thdradius, double *static_press, box_t tbox )
+cudaError_t gpu_calc_force( vec_t   *conf, 
+                            hycon_t *hycon, 
+                            double  *press, 
+                            box_t    box )
     {
-    const int block_size = 256;
+    //const int block_size = max_size_of_cell;
+    const int block_size = (int) pow(2.0, ceil( log((double)max_size_of_cell)/log(2.0) ));
 
-    const int natom = tbox.natom;
-    const double lx = tbox.len.x;
+    const int nblocks = hycon->args.nblocks;
 
+    const double lx = box.len.x;
+
+    check_cuda( cudaDeviceSynchronize() );
     g_wili = 0.0;
+
+    const int grids   = nblocks;
+    const int threads = block_size * block_size;
+    const int shared_mem_size = block_size*sizeof(double);
+    //printf("block size is %d x %d\n", block_size, nblocks);
+    if ( threads > 1024 ) printf("#[WARNING] cell size too big\n");
+    // should optimise to consider number of threads exceed maxisum size of a GPU block
+    kernel_calc_force_all_neighb_block <<<grids, threads, shared_mem_size >>> ( conf, hycon->blocks, lx);
+
     check_cuda( cudaDeviceSynchronize() );
 
-    dim3 grids( (natom/block_size)+1, 1, 1 );
-    dim3 threads( block_size, 1, 1 );
-    kernel_calc_force <<< grids, threads >>>( thdconf, thdlist.onelists, thdcon, thdradius, natom, lx );
-    check_cuda( cudaDeviceSynchronize() );
-
-    *static_press = g_wili / 2.0 / lx / lx;
+    *press = g_wili / (double) sysdim / pow(lx, sysdim);
 
     return cudaSuccess;
     }
 
-
-__global__ void kernel_calc_fmax( vec_t *thdconf, int tnatom )
+__global__ void kernel_calc_fmax( vec_t *conf, int natom )
     {
-    __shared__ double block_f[BLOCK_SIZE_256];
+    __shared__ double block_f[256];
     const int tid = threadIdx.x;
     const int i   = threadIdx.x + blockIdx.x * blockDim.x;
 
     block_f[tid] = 0.0;
 
-    if ( i < tnatom )
-        block_f[tid] = fmax( fabs(thdconf[i].x), fabs(thdconf[i].y) );
+    if ( i < natom )
+        block_f[tid] = fmax( fabs(conf[i].x), fabs(conf[i].y) );
 
     __syncthreads();
 
-    int j = BLOCK_SIZE_256;
+    int j = 256;
     j >>= 1;
     while ( j != 0 )
         {
@@ -216,17 +175,17 @@ __global__ void kernel_calc_fmax( vec_t *thdconf, int tnatom )
         atomicMax( &g_fmax, block_f[0] );
     }
 
-double gpu_calc_fmax( vec_t *thdconf, box_t tbox )
+double gpu_calc_fmax( vec_t *conf, box_t box )
     {
-    const int block_size = BLOCK_SIZE_256;
-    const int natom = tbox.natom;
+    const int block_size = 256;
+    const int natom = box.natom;
 
     g_fmax = 0.0;
 
     dim3 grids( (natom/block_size)+1, 1, 1);
     dim3 threads( block_size, 1, 1);
-    kernel_calc_fmax <<< grids, threads >>> ( thdconf, natom );
+    kernel_calc_fmax <<< grids, threads >>> ( conf, natom );
     check_cuda( cudaDeviceSynchronize() );
 
-    return g_fmax;
     }
+

@@ -7,68 +7,47 @@
 
 #include "system.h"
 #include "config.h"
-#include "list.h"
-#include "fire.h"
+#include "mdfunc.h"
 
 int main(void)
     {
-
-    int    deviceno, natom, seed;
-    double press;
-    char   foutput[250];
-    char   foutput_bak[250];
-
-    //scanf("%d",  &deviceno);
-    //scanf("%d",  &natom );
-    //scanf("%d",  &seed );
-    //scanf("%le", &press );
-    //scanf("%s",  foutput );
-    //scanf("%s",  foutput_bak );
-    // test
-    deviceno = 0;
-    natom = 1000000;
-    seed = 1;
-    press = 1.e-2;
-    strcpy(foutput, "con.dat");
-    strcpy(foutput_bak, "con.dat.bak");
-
-    //cudaSetDevice(deviceno);
-    // set
-    box.natom = natom;
+    box_t  box;
+    box.natom = 16384;
     box.phi   = 0.88;
-    sets.seed = seed;
+    sets_t sets;
+    sets.seed = 1;
+    cudaSetDevice(0);
 
-    printf("device number   : %d\n"  , deviceno);
-    printf("number to atoms : %d\n"  , natom );
-    printf("seed            : %d\n"  , seed );
-    printf("target press    : %le\n" , press );
-    printf("foutput         : %s\n"  , foutput );
-    printf("foutput_bak     : %s\n"  , foutput_bak );
+    double  press = 0.0;
+    double  *radius = NULL;
+    vec_t   *con    = NULL;
+    vec_t   *conf   = NULL;
+    check_cuda( cudaMallocManaged( &con,     box.natom*sizeof(vec_t)  ) );
+    check_cuda( cudaMallocManaged( &conf,    box.natom*sizeof(vec_t)  ) );
+    check_cuda( cudaMallocManaged( &radius , box.natom*sizeof(double) ) );
+    gen_config( con, radius, &box, sets );
 
-    // cpu config
-    //printf( "allocate *con, generate a random config\n" );
-    alloc_con( &con, &radius, box.natom );
-    FILE *fdump = fopen(foutput_bak, "r");
-    if ( fdump == NULL ) {
-        gen_config( con, radius, &box, sets );
-        }
-    else {
-        read_config( fdump, con, radius, &box );
-        fclose(fdump);
-        }
+    hycon_t hycon;
+    calc_hypercon_args( &hycon, box );
+    check_cuda( cudaMallocManaged( &hycon.blocks, hycon.args.nblocks*sizeof(cell_t) ) );
+    printf("h\n");//debug
+    gpu_make_hypercon( hycon, con, radius, box);
+    map( hycon );
 
-    // fire
-    //mini_fire_cp( con, radius, &box, press );
-    mini_fire_cv( con, radius, box );
 
-    FILE *fio;
-    fio = fopen(foutput, "w+");
-        fprintf( fio, "%d %26.16e \n", box.natom, box.len.x );
-        for ( int i=0; i<box.natom; i++ )
-            fprintf( fio, "%26.16e  %26.16e  %26.16e \n", con[i].x, con[i].y, radius[i] );
-    fclose(fio);
+    FILE *fptr= fopen("i_con.dat", "w+");
+    write_config( fptr, con, radius, &box );
+    fclose(fptr);
+
+
+    for ( int tep = 0; tep < 1000; tep++ )
+    gpu_calc_force( conf, &hycon, &press, box );
+    printf("%26.16e\n", press);
+
+
+    fptr= fopen("i_conf.dat", "w+");
+    write_config( fptr, conf, radius, &box );
+    fclose(fptr);
 
     return 0;
     }
-    //// fire on gpu
-    //mini_fire_cv( con, radius, box );
