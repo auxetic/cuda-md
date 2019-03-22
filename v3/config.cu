@@ -385,16 +385,25 @@ __inline__ __device__ int indexb( double rx, double ry, double rz, double lx, in
     }
 
 
-__global__ void kernel_reset_hypercon_block(cell_t *block)
+__global__ void kernel_reset_hypercon_block(cell_t *blocks)
     {
-    const int i = threadIdx.x;
+    const int i   = threadIdx.x;
+    const int bid = blockIdx.x;
 
-    block->rx[i]     = 0.0;
-    block->ry[i]     = 0.0;
-    block->rz[i]     = 0.0;
-    block->radius[i] = 0.0;
-    block->extraflag = 0;
-    block->tag[i]    = -1;
+    if ( i == 0 ) blocks[bid].natom     = 0;
+    if ( i == 0 ) blocks[bid].extraflag = 0;
+
+    blocks[bid].r[i].x     = 0.0;
+    blocks[bid].r[i].y     = 0.0;
+    blocks[bid].r[i].z     = 0.0;
+    blocks[bid].v[i].x     = 0.0;
+    blocks[bid].v[i].y     = 0.0;
+    blocks[bid].v[i].z     = 0.0;
+    blocks[bid].f[i].x     = 0.0;
+    blocks[bid].f[i].y     = 0.0;
+    blocks[bid].f[i].z     = 0.0;
+    blocks[bid].radius[i]  = 0.0;
+    blocks[bid].tag[i]     = -1;
     }
 
 // calculte index of each atom and register it into block structure // map config into hyperconfig
@@ -433,11 +442,11 @@ __global__ void kernel_make_hypercon( cell_t *blocks,
     int idxinblock = atomicAdd( &blocks[bid].natom, 1);
     if ( idxinblock < max_size_of_cell - 1 )
         {
-        blocks[bid].rx[idxinblock]     = x;
-        blocks[bid].ry[idxinblock]     = y;
-        blocks[bid].rz[idxinblock]     = z;
-        blocks[bid].radius[idxinblock] = ri;
-        blocks[bid].tag[idxinblock]    = i;
+        blocks[bid].r[idxinblock].x     = x;
+        blocks[bid].r[idxinblock].y     = y;
+        blocks[bid].r[idxinblock].z     = z;
+        blocks[bid].radius[idxinblock]  = ri;
+        blocks[bid].tag[idxinblock]     = i;
         }
     else
         {
@@ -464,15 +473,9 @@ cudaError_t gpu_make_hypercon( hycon_t hycon, vec_t *con, double *radius, box_t 
     int grids, threads;
 
     //reset hypercon
-    cell_t *block;
-    for ( int i = 0; i < nblocks; i++ )
-        {
-        block = &hycon.blocks[i];
-
-        block->natom = 0;
-        threads = max_size_of_cell;
-        kernel_reset_hypercon_block <<<1, threads>>> (block);
-        }
+    grids   = nblocks;
+    threads = max_size_of_cell;
+    kernel_reset_hypercon_block <<<grids, threads>>> (hycon.blocks);
     check_cuda( cudaDeviceSynchronize() );
 
     // recalculate hypercon block length
@@ -509,9 +512,9 @@ __global__ void kernel_map_hypercon_con (cell_t *block, vec_t *con, double *radi
 
     if ( tid >= block->natom) return;
 
-    con[i].x  = block->rx[tid];
-    con[i].y  = block->ry[tid];
-    con[i].z  = block->rz[tid];
+    con[i].x  = block->r[tid].x;
+    con[i].y  = block->r[tid].y;
+    con[i].z  = block->r[tid].z;
     radius[i] = block->radius[tid];
     }
 

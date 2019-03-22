@@ -40,8 +40,10 @@ int main(void)
     fclose(fptr);
 
 
+    for ( int tep = 0; tep < 1000; tep++ )
     gpu_calc_force( conf, &hycon, &press, box );
     printf("%26.16e\n", press);
+
 
     fptr= fopen("i_conf.dat", "w+");
     write_config( fptr, conf, radius, &box );
