@@ -515,19 +515,16 @@ __global__ void kernel_map_hypercon_con (cell_t *block, vec_t *con, double *radi
     radius[i] = block->radius[tid];
     }
 
-cudaError_t gpu_map_hypercon_con( hycon_t *hycon, vec_t *con, double *radius, box_t box)
+cudaError_t gpu_map_hypercon_con( hycon_t hycon, vec_t *con, double *radius, box_t box)
     {
-    const int nblocks    = hycon->args.nblocks;
-    // const int nblockx = hycon->args.nblock.x;
-    // const int natom   = box.natom;
-    // const double lx   = box.len.x;
+    const int nblocks    = hycon.args.nblocks;
 
     //map hypercon into normal con with index of atom unchanged
     int grids, threads;
     cell_t *block;
     for ( int i = 0; i < nblocks; i++ )
         {
-        block = &hycon->blocks[i];
+        block = &hycon.blocks[i];
         grids = 1;
         threads = max_size_of_cell;
         kernel_map_hypercon_con<<<grids, threads>>>(block, con, radius);
