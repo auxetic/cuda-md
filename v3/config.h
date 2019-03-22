@@ -66,11 +66,10 @@ void recalc_nblocks( hycon_t *hycon, box_t box );
 
 // subroutines for hyperconfiguration
 void map( hycon_t hycon );
-//void map( hycon_t *hycon );
 void calc_hypercon_args( hycon_t *hycon, box_t box );
 void recalc_hypercon_args( hycon_t *hycon, box_t box );
 cudaError_t alloc_managed_hypercon( hycon_t *hycon );
-cudaError_t gpu_map_hypercon_con( hycon_t hycon, vec_t *con, double *radius, box_t box);
+cudaError_t gpu_map_hypercon_con( hycon_t hycon, vec_t *, vec_t *, vec_t *, double *radius);
 cudaError_t gpu_make_hypercon( hycon_t hycon, vec_t *con, double *radius, box_t box);
 
 #endif

@@ -21,8 +21,10 @@ int main(void)
     double  press = 0.0;
     double  *radius = NULL;
     vec_t   *con    = NULL;
+    vec_t   *conv   = NULL;
     vec_t   *conf   = NULL;
     check_cuda( cudaMallocManaged( &con,     box.natom*sizeof(vec_t)  ) );
+    check_cuda( cudaMallocManaged( &conv,    box.natom*sizeof(vec_t)  ) );
     check_cuda( cudaMallocManaged( &conf,    box.natom*sizeof(vec_t)  ) );
     check_cuda( cudaMallocManaged( &radius , box.natom*sizeof(double) ) );
     gen_config( con, radius, &box, sets );
@@ -30,19 +32,20 @@ int main(void)
     hycon_t hycon;
     calc_hypercon_args( &hycon, box );
     check_cuda( cudaMallocManaged( &hycon.blocks, hycon.args.nblocks*sizeof(cell_t) ) );
-    printf("h\n");//debug
+    printf("Start\n");//debug
     gpu_make_hypercon( hycon, con, radius, box);
     map( hycon );
-
 
     FILE *fptr= fopen("i_con.dat", "w+");
     write_config( fptr, con, radius, &box );
     fclose(fptr);
 
 
-    for ( int tep = 0; tep < 1000; tep++ )
-    gpu_calc_force( conf, &hycon, &press, box );
+    //for ( int tep = 0; tep < 1000; tep++ )
+    gpu_calc_force( &hycon, &press, box );
     printf("%26.16e\n", press);
+
+    gpu_map_hypercon_con( hycon, con, conv, conf, radius);
 
 
     fptr= fopen("i_conf.dat", "w+");

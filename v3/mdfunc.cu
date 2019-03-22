@@ -4,26 +4,23 @@ __managed__ double g_fmax;
 __managed__ double g_wili;
 
 // calculate force of one block with all its neighbour at once
-__global__ void kernel_calc_force_all_neighb_block( vec_t        *conf, 
-                                                    cell_t       *blocks, 
+__global__ void kernel_calc_force_all_neighb_block( cell_t *blocks, 
                                                     const double lx )
     {
     const int bidi = blockIdx.x;
     const int tid  = threadIdx.x;
 
     __shared__ cell_t         blocki, blockj;
-    __shared__ double         fx[max_size_of_cell];
-    __shared__ double         fy[max_size_of_cell];
-    __shared__ double         fz[max_size_of_cell];
+    __shared__ vec_t          f[max_size_of_cell];
     __shared__ double  extern wi[];
 
     if ( tid == 0 ) blocki = blocks[bidi];
     if ( tid < (int) sqrt((double) blockDim.x) ) wi[tid] = 0.0;
     if ( tid < max_size_of_cell ) 
         {
-        fx[tid] = 0.0;
-        fy[tid] = 0.0;
-        fz[tid] = 0.0;
+        f[tid].x = 0.0;
+        f[tid].y = 0.0;
+        f[tid].z = 0.0;
         }
 
     __syncthreads();
@@ -50,9 +47,9 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
 
             double Vr = - ( 1.0 - rij/dij ) / dij;
 
-            atomicAdd(&fx[i], + Vr * rxij / rij);
-            atomicAdd(&fy[i], + Vr * ryij / rij);
-            atomicAdd(&fz[i], + Vr * rzij / rij);
+            atomicAdd(&f[i].x, + Vr * rxij / rij);
+            atomicAdd(&f[i].y, + Vr * ryij / rij);
+            atomicAdd(&f[i].z, + Vr * rzij / rij);
 
             atomicAdd(&wi[i], - Vr * rij);
             }
@@ -83,9 +80,9 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
 
                 double Vr = - ( 1.0 - rij/dij ) / dij;
 
-                atomicAdd(&fx[i], + Vr * rxij / rij);
-                atomicAdd(&fy[i], + Vr * ryij / rij);
-                atomicAdd(&fz[i], + Vr * rzij / rij);
+                atomicAdd(&f[i].x, + Vr * rxij / rij);
+                atomicAdd(&f[i].y, + Vr * ryij / rij);
+                atomicAdd(&f[i].z, + Vr * rzij / rij);
 
                 atomicAdd(&wi[i], - Vr * rij);
                 }
@@ -103,9 +100,9 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
     if ( tid < blocki.natom )
         {
         int iatom = blocki.tag[tid];
-        conf[iatom].x = fx[tid];
-        conf[iatom].y = fy[tid];
-        conf[iatom].z = fz[tid];
+        blocki.f[tid].x = f[tid].x;
+        blocki.f[tid].y = f[tid].y;
+        blocki.f[tid].z = f[tid].z;
         }
 
     __syncthreads();
@@ -114,14 +111,14 @@ __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf,
         {
         atomicAdd(&g_wili, wi[0]);
         }
+    if ( tid == 1 ) blocks[bidi] = blocki;
     }
 
-cudaError_t gpu_calc_force( vec_t   *conf, 
+cudaError_t gpu_calc_force(  
                             hycon_t *hycon, 
                             double  *press, 
                             box_t    box )
     {
-    //const int block_size = max_size_of_cell;
     const int block_size = (int) pow(2.0, ceil( log((double)max_size_of_cell)/log(2.0) ));
 
     const int nblocks = hycon->args.nblocks;
@@ -137,7 +134,7 @@ cudaError_t gpu_calc_force( vec_t   *conf,
     //printf("block size is %d x %d\n", block_size, nblocks);
     if ( threads > 1024 ) printf("#[WARNING] cell size too big\n");
     // should optimise to consider number of threads exceed maxisum size of a GPU block
-    kernel_calc_force_all_neighb_block <<<grids, threads, shared_mem_size >>> ( conf, hycon->blocks, lx);
+    kernel_calc_force_all_neighb_block <<<grids, threads, shared_mem_size >>> ( hycon->blocks, lx);
 
     check_cuda( cudaDeviceSynchronize() );
 

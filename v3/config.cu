@@ -504,35 +504,48 @@ cudaError_t gpu_make_hypercon( hycon_t hycon, vec_t *con, double *radius, box_t 
     }
 
 
-__global__ void kernel_map_hypercon_con (cell_t *block, vec_t *con, double *radius)
+__global__ void kernel_map_hypercon_con (cell_t *blocks, 
+                                         vec_t  *con, 
+                                         vec_t  *conv, 
+                                         vec_t  *conf, 
+                                         double *radius)
     {
+    const int bid = blockIdx.x;
     const int tid = threadIdx.x;
 
-    const int i = block->tag[tid];
+    const int i = blocks[bid].tag[tid];
 
-    if ( tid >= block->natom) return;
+    if ( tid >= blocks[bid].natom) return;
 
-    con[i].x  = block->r[tid].x;
-    con[i].y  = block->r[tid].y;
-    con[i].z  = block->r[tid].z;
-    radius[i] = block->radius[tid];
+    con[i].x   = blocks[bid].r[tid].x;
+    con[i].y   = blocks[bid].r[tid].y;
+    con[i].z   = blocks[bid].r[tid].z;
+    conv[i].x  = blocks[bid].v[tid].x;
+    conv[i].y  = blocks[bid].v[tid].y;
+    conv[i].z  = blocks[bid].v[tid].z;
+    conf[i].x  = blocks[bid].f[tid].x;
+    conf[i].y  = blocks[bid].f[tid].y;
+    conf[i].z  = blocks[bid].f[tid].z;
+    radius[i]  = blocks[bid].radius[tid];
     }
 
-cudaError_t gpu_map_hypercon_con( hycon_t hycon, vec_t *con, double *radius, box_t box)
+cudaError_t gpu_map_hypercon_con( hycon_t hycon, 
+                                  vec_t   *con, 
+                                  vec_t   *conv, 
+                                  vec_t   *conf, 
+                                  double  *radius)
     {
-    const int nblocks    = hycon.args.nblocks;
+    const int nblocks = hycon.args.nblocks;
 
     //map hypercon into normal con with index of atom unchanged
     int grids, threads;
-    cell_t *block;
-    for ( int i = 0; i < nblocks; i++ )
-        {
-        block = &hycon.blocks[i];
-        grids = 1;
-        threads = max_size_of_cell;
-        kernel_map_hypercon_con<<<grids, threads>>>(block, con, radius);
-        }
+
+    grids = nblocks; 
+    threads = max_size_of_cell;
+    kernel_map_hypercon_con<<<grids, threads>>>(hycon.blocks, con, conv, conf, radius);
+
     check_cuda( cudaDeviceSynchronize() );
 
     return cudaSuccess;
     }
+
