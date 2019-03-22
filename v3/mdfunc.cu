@@ -5,11 +5,12 @@ __managed__ double g_wili;
 
 // calculate force of one block with all its neighbour at once
 __global__ void kernel_calc_force_all_neighb_block( vec_t        *conf, 
-                                                    cell_t      *blocks, 
-                                                    const int    bidi, 
+                                                    cell_t       *blocks, 
+                                                    //const int    bidi, 
                                                     const double lx )
     {
-    const int tid = threadIdx.x;
+    const int bidi = blockIdx.x;
+    const int tid  = threadIdx.x;
 
     __shared__ cell_t blocki, blockj;
     __shared__ double  fx[max_size_of_cell];
@@ -131,19 +132,11 @@ cudaError_t gpu_calc_force( vec_t   *conf,
     check_cuda( cudaDeviceSynchronize() );
     g_wili = 0.0;
 
-    int grids, threads;
-    printf("desine block_size is %d x %d\n", block_size, nblocks);
-    grids   = 1;
-    threads = block_size * block_size;
-    if ( threads > 1024 ) 
-        {
-        printf("cell size too big\n");
-        }
-    for ( int i = 0; i < nblocks; i++ )
-        {
-        // should optimise to consider number of threads exceed maxisum size of a GPU block
-        kernel_calc_force_all_neighb_block <<<grids, threads >>> ( conf, hycon->blocks, i, lx);
-        }
+    const int grids   = nblocks;
+    const int threads = block_size * block_size;
+    if ( threads > 1024 ) printf("#[WARNING] cell size too big\n");
+    // should optimise to consider number of threads exceed maxisum size of a GPU block
+    kernel_calc_force_all_neighb_block <<<grids, threads >>> ( conf, hycon->blocks, lx);
 
     check_cuda( cudaDeviceSynchronize() );
 

@@ -21,30 +21,24 @@ typedef struct cell_t
     {
     int    natom;
     int    neighb[26];
+    int    tag[max_size_of_cell];
 
     double rx[max_size_of_cell];
     double ry[max_size_of_cell];
     double rz[max_size_of_cell];
     double radius[max_size_of_cell];
-    int    tag[max_size_of_cell];
 
     double vx[max_size_of_cell];
     double vy[max_size_of_cell];
     double vz[max_size_of_cell];
 
-    int    extraflag;
-    struct cell_t *extra = NULL;
-    } cell_t;
-
-typedef struct 
-    {
     double fx[max_size_of_cell];
     double fy[max_size_of_cell];
     double fz[max_size_of_cell];
 
     int    extraflag;
     struct cell_t *extra = NULL;
-    } dyn_t;
+    } cell_t;
 
 typedef struct
     {
@@ -59,7 +53,6 @@ typedef struct
     {
     hycon_args_t args;
     cell_t      *blocks;
-    dyn_t       *forces;
     } hycon_t;
 
 // subroutines for configuration
