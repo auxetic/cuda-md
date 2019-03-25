@@ -7,7 +7,7 @@
 
 #include "system.h"
 #include "config.h"
-#include "mdfunc.h"
+//#include "mdfunc.h"
 
 int main(void)
     {
@@ -29,23 +29,35 @@ int main(void)
     check_cuda( cudaMallocManaged( &radius , box.natom*sizeof(double) ) );
     gen_config( con, radius, &box, sets );
 
-    hycon_t hycon;
-    calc_hypercon_args( &hycon, box );
-    check_cuda( cudaMallocManaged( &hycon.blocks, hycon.args.nblocks*sizeof(cell_t) ) );
-    printf("Start\n");//debug
-    gpu_make_hypercon( hycon, con, radius, box);
+    hycon_t *hycon;
+    check_cuda( cudaMallocManaged( &hycon, sizeof(hycon_t) ) );
+    calc_hypercon_args( hycon, box ); hycon->first_time = 1;
+    printf("nubmer of total cells are %d\n",hycon->nblocks);
+    check_cuda( cudaMallocManaged( &hycon->extraflag,   hycon->nblocks*sizeof(int  ) ) );
+    check_cuda( cudaMallocManaged( &hycon->cnatom,      hycon->nblocks*sizeof(int  ) ) );
+    check_cuda( cudaMallocManaged( &hycon->neighb,   26*hycon->nblocks*sizeof(int  ) ) );
+    check_cuda( cudaMallocManaged( &hycon->tag   , msoc*hycon->nblocks*sizeof(int  ) ) );
+    check_cuda( cudaMallocManaged( &hycon->radius, msoc*hycon->nblocks*sizeof(double) ) );
+    check_cuda( cudaMallocManaged( &hycon->r,      msoc*hycon->nblocks*sizeof(vec_t)  ) );
+    check_cuda( cudaMallocManaged( &hycon->v,      msoc*hycon->nblocks*sizeof(vec_t)  ) );
+    check_cuda( cudaMallocManaged( &hycon->f,      msoc*hycon->nblocks*sizeof(vec_t)  ) );
     map( hycon );
+    printf("Start mapping from normal configuration into hyperconfiguration\n");//debug
+    gpu_make_hypercon( hycon, con, radius, box);
 
     FILE *fptr= fopen("i_con.dat", "w+");
     write_config( fptr, con, radius, &box );
     fclose(fptr);
 
-    for ( int tep = 0; tep < 1000; tep++ )
-    gpu_calc_force( &hycon, &press, box );
-    printf("%26.16e\n", press);
+    //for ( int tep = 0; tep < 1000; tep++ )
+    //gpu_calc_force( &hycon, &press, box );
+    //printf("%26.16e\n", press);
 
     gpu_map_hypercon_con( hycon, con, conv, conf, radius);
 
+    fptr= fopen("mapped_con.dat", "w+");
+    write_config( fptr, con, radius, &box );
+    fclose(fptr);
 
     fptr= fopen("i_conf.dat", "w+");
     write_config( fptr, conf, radius, &box );
