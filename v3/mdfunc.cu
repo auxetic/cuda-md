@@ -4,18 +4,30 @@ __managed__ double g_fmax;
 __managed__ double g_wili;
 
 // calculate force of one block with all its neighbour at once
-__global__ void kernel_calc_force_all_neighb_block( cell_t *blocks, 
+__global__ void kernel_calc_force_all_neighb_block( hycon_t *hycon, 
                                                     const double lx )
     {
     const int bidi = blockIdx.x;
     const int tid  = threadIdx.x;
 
-    __shared__ cell_t         blocki, blockj;
-    __shared__ vec_t          f[max_size_of_cell];
-    __shared__ double  extern wi[];
+    __shared__ double         radi[max_size_of_cell];
+    __shared__ double         radj[max_size_of_cell];
+    __shared__ vec_t          ri[max_size_of_cell];
+    __shared__ vec_t          rj[max_size_of_cell]; 
+    __shared__ vec_t          f [max_size_of_cell];
+    __shared__ double extern  wi[];
 
-    if ( tid == 0 ) blocki = blocks[bidi];
-    if ( tid < (int) sqrt((double) blockDim.x) ) wi[tid] = 0.0;
+    //if ( tid == 0 ) blocki = blocks[bidi];
+    const int natomi = hycon->cnatom[bidi];
+
+    if ( tid < natomi ) 
+        {
+        ri[tid].x = hycon->r[bidi*msoc+tid].x;
+        ri[tid].y = hycon->r[bidi*msoc+tid].y;
+        ri[tid].z = hycon->r[bidi*msoc+tid].z;
+        radi[tid] = hycon->radius[bidi*msoc+tid];
+        }
+
     if ( tid < max_size_of_cell ) 
         {
         f[tid].x = 0.0;
@@ -23,23 +35,25 @@ __global__ void kernel_calc_force_all_neighb_block( cell_t *blocks,
         f[tid].z = 0.0;
         }
 
+    if ( tid < (int) sqrt((double) blockDim.x) ) wi[tid] = 0.0;
+
     __syncthreads();
 
-    const int i   = tid % blocki.natom;
-    const int j   = tid / blocki.natom;
+    const int i      = tid % natomi;
+    const int j      = tid / natomi;
 
     // self block force
-    if ( tid < blocki.natom*blocki.natom && i != j )
+    if ( tid < natomi*natomi && i != j )
         {
-        double rxij  = blocki.r[j].x-blocki.r[i].x;
-        double ryij  = blocki.r[j].y-blocki.r[i].y;
-        double rzij  = blocki.r[j].z-blocki.r[i].z;
+        double rxij  = ri[j].x-ri[i].x;
+        double ryij  = ri[j].y-ri[i].y;
+        double rzij  = ri[j].z-ri[i].z;
         rxij -= round(rxij/lx)*lx;
         ryij -= round(ryij/lx)*lx;
         rzij -= round(rzij/lx)*lx;
 
         double rij = rxij*rxij + ryij*ryij + rzij*rzij;
-        double dij = blocki.radius[j] + blocki.radius[i];
+        double dij = radi[j] + radi[i];
         
         if ( rij < dij*dij )
             {
@@ -52,27 +66,40 @@ __global__ void kernel_calc_force_all_neighb_block( cell_t *blocks,
             atomicAdd(&f[i].z, + Vr * rzij / rij);
 
             atomicAdd(&wi[i], - Vr * rij);
+            printf("%26.16le\n", -Vr*rij);
             }
         }
+
+    __syncthreads();
 
     // joint block force
     for ( int jj=0; jj<26; jj++ )
         {
-        if ( tid == 0 )
-            blockj = blocks[blocki.neighb[jj]];
+        int bidj, natomj;
+
+        bidj = hycon->neighb[26*bidi+jj];
+        natomj = hycon->cnatom[bidj];
+
+        if ( tid < natomj ) 
+            {
+            rj[tid].x = hycon->r[bidj*msoc+tid].x;
+            rj[tid].y = hycon->r[bidj*msoc+tid].y;
+            rj[tid].z = hycon->r[bidj*msoc+tid].z;
+            radj[tid] = hycon->radius[bidj*msoc+tid];
+            }
         __syncthreads();
 
-        if ( tid < blocki.natom*blockj.natom )
+        if ( tid < natomi*natomj )
             {
-            double rxij  = blockj.r[j].x-blocki.r[i].x;
-            double ryij  = blockj.r[j].y-blocki.r[i].y;
-            double rzij  = blockj.r[j].z-blocki.r[i].z;
+            double rxij  = rj[j].x-ri[i].x;
+            double ryij  = rj[j].y-ri[i].y;
+            double rzij  = rj[j].z-ri[i].z;
             rxij -= round(rxij/lx)*lx;
             ryij -= round(ryij/lx)*lx;
             rzij -= round(rzij/lx)*lx;
 
             double rij = rxij*rxij + ryij*ryij + rzij*rzij;
-            double dij = blocki.radius[i] + blockj.radius[j];
+            double dij = radi[i] + radj[j];
 
             if ( rij < dij*dij )
                 {
@@ -97,12 +124,11 @@ __global__ void kernel_calc_force_all_neighb_block( cell_t *blocks,
         s >>= 1;
         }
 
-    if ( tid < blocki.natom )
+    if ( tid < natomi )
         {
-        int iatom = blocki.tag[tid];
-        blocki.f[tid].x = f[tid].x;
-        blocki.f[tid].y = f[tid].y;
-        blocki.f[tid].z = f[tid].z;
+        hycon->f[bidi*msoc+tid].x = f[tid].x;
+        hycon->f[bidi*msoc+tid].y = f[tid].y;
+        hycon->f[bidi*msoc+tid].z = f[tid].z;
         }
 
     __syncthreads();
@@ -111,17 +137,16 @@ __global__ void kernel_calc_force_all_neighb_block( cell_t *blocks,
         {
         atomicAdd(&g_wili, wi[0]);
         }
-    if ( tid == 1 ) blocks[bidi] = blocki;
+
     }
 
-cudaError_t gpu_calc_force(  
-                            hycon_t *hycon, 
+cudaError_t gpu_calc_force( hycon_t *hycon, 
                             double  *press, 
                             box_t    box )
     {
-    const int block_size = (int) pow(2.0, ceil( log((double)max_size_of_cell)/log(2.0) ));
+    const int block_size = (int) pow( 2.0, ceil( log( (double) max_size_of_cell) / log(2.0) ) );
 
-    const int nblocks = hycon->args.nblocks;
+    const int nblocks = hycon->nblocks;
 
     const double lx = box.len.x;
 
@@ -131,10 +156,10 @@ cudaError_t gpu_calc_force(
     const int grids   = nblocks;
     const int threads = block_size * block_size;
     const int shared_mem_size = block_size*sizeof(double);
-    //printf("block size is %d x %d\n", block_size, nblocks);
+    printf("block size is %d x %d\n", block_size, nblocks);
     if ( threads > 1024 ) printf("#[WARNING] cell size too big\n");
     // should optimise to consider number of threads exceed maxisum size of a GPU block
-    kernel_calc_force_all_neighb_block <<<grids, threads, shared_mem_size >>> ( hycon->blocks, lx);
+    kernel_calc_force_all_neighb_block <<<grids, threads, shared_mem_size >>> ( hycon, lx);
 
     check_cuda( cudaDeviceSynchronize() );
 

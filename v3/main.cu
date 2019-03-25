@@ -7,7 +7,7 @@
 
 #include "system.h"
 #include "config.h"
-//#include "mdfunc.h"
+#include "mdfunc.h"
 
 int main(void)
     {
@@ -16,7 +16,7 @@ int main(void)
     box.phi   = 0.88;
     sets_t sets;
     sets.seed = 1;
-    cudaSetDevice(0);
+    cudaSetDevice(3);
 
     double  press = 0.0;
     double  *radius = NULL;
@@ -50,9 +50,14 @@ int main(void)
     fclose(fptr);
 
     //for ( int tep = 0; tep < 1000; tep++ )
-    //gpu_calc_force( &hycon, &press, box );
-    //printf("%26.16e\n", press);
+    gpu_calc_force( hycon, &press, box );
+    printf("press is %26.16e\n", press);
 
+    for ( int i = 0; i < box.natom; i++ ) {
+        con[i].x = 0.0;
+        con[i].y = 0.0;
+        con[i].z = 0.0;
+        }
     gpu_map_hypercon_con( hycon, con, conv, conf, radius);
 
     fptr= fopen("mapped_con.dat", "w+");
