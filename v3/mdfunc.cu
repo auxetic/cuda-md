@@ -7,8 +7,8 @@ __managed__ double g_wili;
 __global__ void kernel_calc_force_all_neighb_block( hycon_t *hycon, 
                                                     const double lx )
     {
-    const int bidi = blockIdx.x;
-    const int tid  = threadIdx.x;
+    //const int blockIdx.x = blockIdx.x;
+    //const int threadIdx.x  = threadIdx.x;
 
     __shared__ double         radi[max_size_of_cell];
     __shared__ double         radj[max_size_of_cell];
@@ -17,33 +17,33 @@ __global__ void kernel_calc_force_all_neighb_block( hycon_t *hycon,
     __shared__ vec_t          f [max_size_of_cell];
     __shared__ double extern  wi[];
 
-    //if ( tid == 0 ) blocki = blocks[bidi];
-    const int natomi = hycon->cnatom[bidi];
+    //if ( threadIdx.x == 0 ) blocki = blocks[blockIdx.x];
+    const int natomi = hycon->cnatom[blockIdx.x];
 
-    if ( tid < natomi ) 
+    if ( threadIdx.x < natomi ) 
         {
-        ri[tid].x = hycon->r[bidi*msoc+tid].x;
-        ri[tid].y = hycon->r[bidi*msoc+tid].y;
-        ri[tid].z = hycon->r[bidi*msoc+tid].z;
-        radi[tid] = hycon->radius[bidi*msoc+tid];
+        ri[threadIdx.x].x = hycon->r[blockIdx.x*msoc+threadIdx.x].x;
+        ri[threadIdx.x].y = hycon->r[blockIdx.x*msoc+threadIdx.x].y;
+        ri[threadIdx.x].z = hycon->r[blockIdx.x*msoc+threadIdx.x].z;
+        radi[threadIdx.x] = hycon->radius[blockIdx.x*msoc+threadIdx.x];
         }
 
-    if ( tid < max_size_of_cell ) 
+    if ( threadIdx.x < max_size_of_cell ) 
         {
-        f[tid].x = 0.0;
-        f[tid].y = 0.0;
-        f[tid].z = 0.0;
+        f[threadIdx.x].x = 0.0;
+        f[threadIdx.x].y = 0.0;
+        f[threadIdx.x].z = 0.0;
         }
 
-    if ( tid < (int) sqrt((double) blockDim.x) ) wi[tid] = 0.0;
+    if ( threadIdx.x < (int) sqrt((double) blockDim.x) ) wi[threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    const int i      = tid % natomi;
-    const int j      = tid / natomi;
+    const int i      = threadIdx.x % natomi;
+    const int j      = threadIdx.x / natomi;
 
     // self block force
-    if ( tid < natomi*natomi && i != j )
+    if ( threadIdx.x < natomi*natomi && i != j )
         {
         double rxij  = ri[j].x-ri[i].x;
         double ryij  = ri[j].y-ri[i].y;
@@ -77,19 +77,19 @@ __global__ void kernel_calc_force_all_neighb_block( hycon_t *hycon,
         {
         int bidj, natomj;
 
-        bidj = hycon->neighb[26*bidi+jj];
+        bidj = hycon->neighb[26*blockIdx.x+jj];
         natomj = hycon->cnatom[bidj];
 
-        if ( tid < natomj ) 
+        if ( threadIdx.x < natomj ) 
             {
-            rj[tid].x = hycon->r[bidj*msoc+tid].x;
-            rj[tid].y = hycon->r[bidj*msoc+tid].y;
-            rj[tid].z = hycon->r[bidj*msoc+tid].z;
-            radj[tid] = hycon->radius[bidj*msoc+tid];
+            rj[threadIdx.x].x = hycon->r[bidj*msoc+threadIdx.x].x;
+            rj[threadIdx.x].y = hycon->r[bidj*msoc+threadIdx.x].y;
+            rj[threadIdx.x].z = hycon->r[bidj*msoc+threadIdx.x].z;
+            radj[threadIdx.x] = hycon->radius[bidj*msoc+threadIdx.x];
             }
         __syncthreads();
 
-        if ( tid < natomi*natomj )
+        if ( threadIdx.x < natomi*natomj )
             {
             double rxij  = rj[j].x-ri[i].x;
             double ryij  = rj[j].y-ri[i].y;
@@ -117,23 +117,23 @@ __global__ void kernel_calc_force_all_neighb_block( hycon_t *hycon,
         }
 
     int s = (int)sqrt((double)blockDim.x) / 2;
-    while ( tid < s )
+    while ( threadIdx.x < s )
         {
         __syncthreads();
-        wi[tid] += wi[tid+s];
+        wi[threadIdx.x] += wi[threadIdx.x+s];
         s >>= 1;
         }
 
-    if ( tid < natomi )
+    if ( threadIdx.x < natomi )
         {
-        hycon->f[bidi*msoc+tid].x = f[tid].x;
-        hycon->f[bidi*msoc+tid].y = f[tid].y;
-        hycon->f[bidi*msoc+tid].z = f[tid].z;
+        hycon->f[blockIdx.x*msoc+threadIdx.x].x = f[threadIdx.x].x;
+        hycon->f[blockIdx.x*msoc+threadIdx.x].y = f[threadIdx.x].y;
+        hycon->f[blockIdx.x*msoc+threadIdx.x].z = f[threadIdx.x].z;
         }
 
     __syncthreads();
 
-    if ( tid == 0 )
+    if ( threadIdx.x == 0 )
         {
         atomicAdd(&g_wili, wi[0]);
         }
