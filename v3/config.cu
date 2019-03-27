@@ -274,7 +274,7 @@ void map( hycon_t *hycon )
             for (int iz = 0; iz < nblockx; iz++)
                 {
                     bid        = indexb(ix, iy, iz, nblockx);
-                    neighb     = &hycon->neighb[bid*msoc];
+                    neighb     = &hycon->neighb[bid*26];
 
                     neighb[0]  = indexb(ix + 1, iy,     iz, nblockx); 
                     neighb[1]  = indexb(ix + 1, iy + 1, iz, nblockx);
